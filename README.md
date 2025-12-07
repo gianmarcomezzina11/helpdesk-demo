@@ -1,175 +1,181 @@
-# MCP Jitsi JaaS Server
+# MCP Jitsi + MeshCentral Integration
 
-Server MCP (Model Context Protocol) per generare link personalizzati per meeting Jitsi JaaS. Questo server fornisce un tool che crea automaticamente link separati per operatori (moderatori) e partecipanti, con JWT firmati e configurazione automatica.
+Sistema integrato per video chiamate (Jitsi) e controllo remoto (MeshCentral) tramite Model Context Protocol (MCP).
 
-## Caratteristiche
+## 🎯 Funzionalità
 
-- Generazione automatica di link Jitsi JaaS con JWT firmati
-- Link separati per operatore (moderatore) e partecipante
-- Auto-join configurato (senza pagina di pre-join)
-- Estrazione automatica del nome dall'indirizzo email
-- Validazione email integrata
-- Gestione scadenza dei link configurabile
-- Nomi stanza unici con timestamp e sanitizzazione
+- **Video Call**: Jitsi Meet con JWT authentication
+- **Controllo Remoto**: MeshCentral desktop remoto
+- **Trasferimento File**: File manager con drag & drop
+- **Due Ruoli**: Operatore (accesso completo) e Partecipante (solo video)
+- **Auto-Join**: Ingresso automatico senza pre-join
+- **Auto-Disconnect**: Disconnessione automatica quando si cambia tab
 
-## Prerequisiti
+## 📋 Requisiti
 
-- Node.js 18+ 
-- Account JaaS (Jitsi as a Service) su https://jaas.8x8.vc/
-- Credenziali JaaS: App ID, Key ID, Private Key
+- Node.js 18+
+- Account Jitsi 8x8 (JaaS)
+- Certificati SSL (per HTTPS)
 
-## Installazione
+## 🚀 Installazione
 
-1. Installa le dipendenze:
+### 1. Clona Repository
+
 ```bash
+git clone https://github.com/gianmarcomezzina11/mcp_meshcentral_jitsi.git
+cd mcp_meshcentral_jitsi
 npm install
 ```
 
-2. Configura le variabili d'ambiente:
+### 2. Configura Variabili Ambiente
 
-Copia il file `.env.example` in `.env` e inserisci le tue credenziali JaaS:
+Copia `.env.example` in `.env` e compila:
 
 ```env
-JAAS_APP_ID=vpaas-magic-cookie-your-app-id-here
-JAAS_KEY_ID=your-key-id-here
-JAAS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour private key here\n-----END PRIVATE KEY-----"
-PORT=3000
+# Jitsi JaaS
+JAAS_APP_ID=your_app_id
+JAAS_KID=your_key_id
+JAAS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+
+# MeshCentral
+MESHCENTRAL_TOKEN_KEY=your_login_token_key_hex
 ```
 
-3. Compila il progetto:
+### 3. Genera Login Token Key MeshCentral
+
+```bash
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+```
+
+Copia l'output in `MESHCENTRAL_TOKEN_KEY`.
+
+### 4. Certificati SSL
+
+Posiziona i certificati MeshCentral in:
+- `meshcentral-data/webserver-cert-public.crt`
+- `meshcentral-data/webserver-cert-private.key`
+
+Oppure MeshCentral li genererà automaticamente al primo avvio.
+
+## 🎮 Utilizzo
+
+### Avvia Server
+
 ```bash
 npm run build
-```
-
-4. Avvia il server:
-```bash
 npm start
 ```
 
-Il server sarà disponibile su `http://localhost:3000`
+Server disponibili:
+- **MCP**: `http://localhost:3000/mcp`
+- **Web App**: `https://localhost:3001`
+- **MeshCentral**: `https://localhost:4000`
 
-## Tool Disponibile
+### Crea Meeting via MCP
 
-### create_jitsi_meeting
+Usa MCP Inspector o Claude Desktop per chiamare il tool:
 
-Crea un nuovo meeting Jitsi e genera due link personalizzati.
-
-**Parametri:**
-- `operator_email` (string, obbligatorio): Email dell'operatore/host
-- `participant_email` (string, obbligatorio): Email del partecipante
-- `meeting_title` (string, opzionale): Titolo della stanza
-- `duration_hours` (number, opzionale, default: 2): Durata validità link in ore
-
-**Risposta:**
 ```json
 {
-  "meeting_id": "meeting-1733328475-x3k9p",
-  "room_name": "project-discussion-1733328475",
-  "operator_link": "https://8x8.vc/...",
-  "participant_link": "https://8x8.vc/...",
-  "created_at": "2024-12-04T15:30:00.000Z",
-  "expires_at": "2024-12-04T18:30:00.000Z",
-  "operator_details": {
-    "email": "gianmarco@ethera.it",
-    "name": "Gianmarco",
-    "role": "moderator"
-  },
-  "participant_details": {
-    "email": "client@company.com",
-    "name": "Client",
-    "role": "participant"
+  "name": "create_video_meeting",
+  "arguments": {
+    "operator_email": "operator@example.com",
+    "participant_email": "participant@example.com",
+    "meshcentral_node_id": "NODE_ID_FROM_MESHCENTRAL"
   }
 }
 ```
 
-## Esempio di Utilizzo
-
-### Test con curl
-
-```bash
-curl -X POST http://localhost:3000/mcp \
-  -H "Content-Type: application/json" \
-  -d @test-tool.json
-```
-
-### Con Claude Desktop
-
-Vedi il file `CLAUDE_DESKTOP_CONFIG.md` per istruzioni dettagliate sulla configurazione.
-
-## Sicurezza
-
-- Le chiavi private non vengono mai esposte nelle risposte
-- I JWT sono firmati con algoritmo RS256
-- Le email vengono validate prima dell'elaborazione
-- I token hanno una scadenza configurabile
-
-## Struttura del Progetto
-
-```
-mcp-jitsi-jaas-server/
-├── src/
-│   └── index.ts              # Server MCP principale
-├── build/                    # File compilati
-├── .env                      # Variabili d'ambiente (non committare!)
-├── .env.example              # Template variabili d'ambiente
-├── package.json              # Dipendenze e script
-├── tsconfig.json             # Configurazione TypeScript
-├── test-tool.json            # Esempio richiesta test
-├── CLAUDE_DESKTOP_CONFIG.md  # Guida configurazione Claude Desktop
-├── QUICK_START.md            # Guida rapida
-└── README.md                 # Questa documentazione
-```
-
-## Dettagli Tecnici
-
-### Generazione JWT
-
-I JWT includono:
-- aud: "jitsi"
-- iss: App ID JaaS
-- sub: App ID JaaS
-- room: Nome stanza
-- exp: Timestamp scadenza
-- context.user: email, name, moderator flag
-
-### Estrazione Nome
-
-Il nome viene estratto dalla parte prima della @ nell'email:
-- `gianmarco@ethera.it` → `Gianmarco`
-- `client@company.com` → `Client`
-
-### Generazione Nome Stanza
-
-Le stanze vengono generate con:
-1. Sanitizzazione del titolo (lowercase, rimozione caratteri speciali)
-2. Timestamp per unicità
-3. Formato: `{titolo-sanitizzato}-{timestamp}` o `meeting-{timestamp}`
-
-## Endpoint HTTP
-
-- **POST /mcp** - Endpoint principale MCP per chiamate tool
-- **GET /health** - Health check
-
-## Gestione Errori
-
-Il tool gestisce automaticamente:
-- Email non valide
-- Credenziali JaaS mancanti
-- Errori di firma JWT
-- Parametri mancanti o non validi
-
-Gli errori vengono ritornati nel formato:
+Risposta:
 ```json
 {
-  "error": true,
-  "message": "Descrizione dell'errore"
+  "operator_link": "https://...",
+  "participant_link": "https://...",
+  "meeting_id": "...",
+  "expires_at": "..."
 }
 ```
 
-## Licenza
+### Configura MeshCentral Agent
+
+1. Accedi a `https://localhost:4000`
+2. Crea account admin
+3. Crea device group
+4. Installa agent sul PC remoto
+5. Copia Node ID dal device
+
+## 🏗️ Architettura
+
+```
+┌─────────────┐
+│   Browser   │
+│  (Operator) │
+└──────┬──────┘
+       │
+       ├─► Video Call (Jitsi 8x8)
+       ├─► Desktop (MeshCentral iframe)
+       └─► Files (MeshCentral iframe)
+
+┌─────────────┐
+│   Browser   │
+│(Participant)│
+└──────┬──────┘
+       │
+       └─► Video Call (Jitsi 8x8)
+```
+
+## 📁 Struttura Progetto
+
+```
+.
+├── src/
+│   └── index.ts          # Server MCP + Express
+├── public/
+│   ├── remote-session.html   # UI principale
+│   └── img/              # Logo ARPAL
+├── meshcentral-data/     # Dati MeshCentral (gitignored)
+├── package.json
+├── tsconfig.json
+└── .env                  # Configurazione (gitignored)
+```
+
+## 🔧 Configurazione Avanzata
+
+### Porte
+
+Modifica in `src/index.ts`:
+- `HTTP_PORT`: 3000 (MCP)
+- `HTTPS_PORT`: 3001 (Web App)
+- `MESHCENTRAL_PORT`: 4000
+
+### User Consent
+
+Disabilitato di default via `_userConsentFlags: 0` in config MeshCentral.
+
+### Tab Auto-Disconnect
+
+Quando cambi tab, l'iframe precedente viene ricaricato per disconnettere la sessione MeshCentral ed evitare conflitti.
+
+## 🐛 Troubleshooting
+
+### MeshCentral chiede ancora consenso
+
+1. Accedi a `https://localhost:4000`
+2. Vai su Device Group → Edit
+3. Disabilita "User Consent" manualmente
+
+### Certificati SSL non validi
+
+Accetta certificato self-signed nel browser o usa certificati Let's Encrypt.
+
+### File transfer blocca desktop
+
+Usa tab separati e cambia tab per disconnettere automaticamente.
+
+## 📝 License
 
 MIT
 
----
+## 👤 Author
 
-**Nota**: Mantieni le tue credenziali JaaS al sicuro e non committarle nel repository!
+ARPAL - Agenzia Regionale per la Protezione dell'Ambiente Ligure
