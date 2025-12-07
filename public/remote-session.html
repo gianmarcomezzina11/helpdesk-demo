@@ -52,6 +52,29 @@
             color: #666;
         }
 
+        .close-session-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: none; /* Nascosto di default, mostrato solo per operatore */
+        }
+
+        .close-session-btn:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+        }
+
+        .close-session-btn:active {
+            transform: translateY(0);
+        }
+
         /* Tab Navigation */
         .tab-navigation {
             background: #f8f9fa;
@@ -246,11 +269,16 @@
         <!-- Header -->
         <div class="header">
             <div class="logo-container">
-                <img src="/img/ARPAL 1 COLORI.jpg" alt="ARPAL Logo">
+                <img src="/img/ARPAL 1 COLORI.jpg" alt="Logo">
                 <h2 style="color: #667eea;">Sessione Remota</h2>
             </div>
-            <div class="session-info" id="session-info">
-                Caricamento...
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div class="session-info" id="session-info">
+                    Caricamento...
+                </div>
+                <button class="close-session-btn" id="close-session-btn" onclick="closeSession()">
+                    🚪 Chiudi Sessione
+                </button>
             </div>
         </div>
 
@@ -343,6 +371,12 @@
             mesh: { url: meshUrl, hasToken: !!meshLoginToken, nodeId: meshNodeId }
         });
         
+        // Mostra pulsante "Chiudi Sessione" solo per operatore
+        if (jitsiIsModerator) {
+            document.getElementById('close-session-btn').style.display = 'block';
+            console.log('👨‍💼 Operatore - Pulsante Chiudi Sessione attivo');
+        }
+        
         // Nascondi tab MeshCentral se non presente meshUrl (per partecipanti)
         if (!meshUrl) {
             console.log('👤 Modalità Partecipante - Solo Video Call');
@@ -358,6 +392,118 @@
         let desktopIframeLoaded = false;
         let filesIframeLoaded = false;
         let currentActiveTab = 'video-call';
+        let jitsiApi = null; // Riferimento all'API Jitsi
+
+        // Funzione per chiudere la sessione (solo operatore)
+        function closeSession() {
+            if (!jitsiIsModerator) {
+                console.warn('⚠️ Solo l\'operatore può chiudere la sessione');
+                return;
+            }
+
+            console.log('🚪 Chiusura sessione in corso...');
+            
+            // Conferma chiusura
+            if (!confirm('Sei sicuro di voler chiudere la sessione per tutti i partecipanti?')) {
+                return;
+            }
+
+            // 1. Disconnetti Desktop (se attivo)
+            const desktopIframe = document.getElementById('meshcentral-frame');
+            if (desktopIframe && desktopIframeLoaded) {
+                try {
+                    const iframeDoc = desktopIframe.contentDocument;
+                    if (iframeDoc) {
+                        const disconnectBtn = iframeDoc.querySelector('input[value="Disconnetti"]') ||
+                                             iframeDoc.querySelector('input[value="Disconnect"]') ||
+                                             iframeDoc.querySelector('input[onclick*="disconnect"]');
+                        if (disconnectBtn && disconnectBtn.style.display !== 'none') {
+                            disconnectBtn.click();
+                            console.log('✅ Desktop disconnesso');
+                        }
+                    }
+                } catch (e) {
+                    console.log('⚠️ Errore disconnessione Desktop:', e.message);
+                }
+            }
+
+            // 2. Disconnetti Files (se attivo)
+            const filesIframe = document.getElementById('meshcentral-files-frame');
+            if (filesIframe && filesIframeLoaded) {
+                try {
+                    const iframeDoc = filesIframe.contentDocument;
+                    if (iframeDoc) {
+                        const disconnectBtn = iframeDoc.querySelector('#p13Disconnect') ||
+                                             iframeDoc.querySelector('input[id*="p13"][value*="Disconnect"]') ||
+                                             iframeDoc.querySelector('input[id*="p13"][value*="Disconnetti"]');
+                        if (disconnectBtn && disconnectBtn.style.display !== 'none') {
+                            disconnectBtn.click();
+                            console.log('✅ Files disconnesso');
+                        }
+                    }
+                } catch (e) {
+                    console.log('⚠️ Errore disconnessione Files:', e.message);
+                }
+            }
+
+            // 3. Aspetta 500ms per completare disconnessioni, poi termina Jitsi
+            setTimeout(() => {
+                // Invia messaggio broadcast per far chiudere tutti i partecipanti
+                if (jitsiApi) {
+                    try {
+                        // Invia comando di chiusura a tutti
+                        jitsiApi.executeCommand('sendEndpointTextMessage', '', JSON.stringify({
+                            type: 'SESSION_CLOSED_BY_OPERATOR'
+                        }));
+                        console.log('📢 Messaggio chiusura inviato a tutti i partecipanti');
+                        
+                        // Aspetta 1 secondo per dare tempo al messaggio di arrivare
+                        setTimeout(() => {
+                            // Poi chiudi anche la sessione dell'operatore
+                            jitsiApi.executeCommand('hangup');
+                            console.log('✅ Meeting Jitsi terminato');
+                        }, 1000);
+                    } catch (e) {
+                        console.error('❌ Errore terminazione Jitsi:', e);
+                        // Fallback: chiudi solo operatore
+                        jitsiApi.executeCommand('hangup');
+                    }
+                }
+
+                // Mostra messaggio "Sessione Chiusa" per operatore dopo 1.5 secondi
+                setTimeout(() => {
+                    document.body.innerHTML = `
+                <div style="
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100vh;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                ">
+                    <div style="
+                        background: white;
+                        color: #333;
+                        padding: 40px 60px;
+                        border-radius: 15px;
+                        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                        text-align: center;
+                    ">
+                        <h1 style="color: #28a745; margin-bottom: 20px;">✅ Sessione Chiusa</h1>
+                        <p style="font-size: 18px; color: #666;">
+                            La sessione è stata terminata con successo.
+                        </p>
+                        <p style="font-size: 14px; color: #999; margin-top: 20px;">
+                            Puoi chiudere questa finestra.
+                        </p>
+                    </div>
+                </div>
+            `;
+                }, 1500); // Fine setTimeout messaggio operatore
+            }, 500); // Fine setTimeout disconnessioni
+        }
 
         // Gestione Tab con Disconnessione Automatica
         const tabButtons = document.querySelectorAll('.tab-button');
@@ -370,33 +516,137 @@
                 
                 console.log(`🔄 Cambio tab: ${previousTab} → ${targetTab}`);
                 
-                // LOGICA DISCONNESSIONE AUTOMATICA
+                // LOGICA DISCONNESSIONE AUTOMATICA (via click su pulsanti MeshCentral)
                 if (previousTab === 'remote-control' && targetTab !== 'remote-control') {
-                    // Uscendo da Desktop → Ricarica iframe per disconnettere
-                    console.log('🔌 Disconnetto Desktop...');
+                    // Uscendo da Desktop → Clicca "Disconnetti"
+                    console.log('🔌 Disconnetto Desktop (click su pulsante)...');
                     const desktopIframe = document.getElementById('meshcentral-frame');
                     if (desktopIframe && desktopIframeLoaded) {
-                        const currentSrc = desktopIframe.src;
-                        desktopIframe.src = 'about:blank';
-                        setTimeout(() => {
-                            desktopIframe.src = currentSrc;
-                            desktopIframeLoaded = false;
-                        }, 100);
+                        try {
+                            const iframeDoc = desktopIframe.contentDocument;
+                            if (iframeDoc) {
+                                // Cerca pulsante Disconnetti (vari selettori possibili)
+                                const disconnectBtn = iframeDoc.querySelector('input[value="Disconnetti"]') ||
+                                                     iframeDoc.querySelector('input[value="Disconnect"]') ||
+                                                     iframeDoc.querySelector('input[onclick*="disconnect"]');
+                                if (disconnectBtn && disconnectBtn.style.display !== 'none') {
+                                    disconnectBtn.click();
+                                    console.log('✅ Click su Disconnetti Desktop');
+                                }
+                            }
+                        } catch (e) {
+                            console.log('⚠️ Non posso cliccare Disconnetti:', e.message);
+                        }
                     }
                 }
                 
                 if (previousTab === 'file-transfer' && targetTab !== 'file-transfer') {
-                    // Uscendo da Files → Ricarica iframe per disconnettere
+                    // Uscendo da Files → Chiudi sessione file
                     console.log('🔌 Disconnetto File Transfer...');
                     const filesIframe = document.getElementById('meshcentral-files-frame');
                     if (filesIframe && filesIframeLoaded) {
-                        const currentSrc = filesIframe.src;
-                        filesIframe.src = 'about:blank';
-                        setTimeout(() => {
-                            filesIframe.src = currentSrc;
-                            filesIframeLoaded = false;
-                        }, 100);
+                        try {
+                            const iframeDoc = filesIframe.contentDocument;
+                            if (iframeDoc) {
+                                // Il pulsante Disconnetti per Files è p13Disconnect (viewmode=13)
+                                const disconnectBtn = iframeDoc.querySelector('#p13Disconnect') ||
+                                                     iframeDoc.querySelector('input[id*="p13"][value*="Disconnect"]') ||
+                                                     iframeDoc.querySelector('input[id*="p13"][value*="Disconnetti"]');
+                                
+                                if (disconnectBtn && disconnectBtn.style.display !== 'none') {
+                                    console.log('📍 Pulsante Disconnetti Files trovato:', disconnectBtn.id, disconnectBtn.value);
+                                    disconnectBtn.click();
+                                    console.log('✅ Click su Disconnetti Files');
+                                } else {
+                                    console.log('⚠️ Pulsante p13Disconnect non trovato o nascosto');
+                                }
+                            }
+                        } catch (e) {
+                            console.log('⚠️ Non posso cliccare Disconnetti Files:', e.message);
+                        }
+                    } else {
+                        console.log('⚠️ Files iframe non disponibile');
                     }
+                }
+                
+                // AUTO-CONNESSIONE quando entri nei tab
+                if (targetTab === 'remote-control' && previousTab !== 'remote-control') {
+                    // Entrando in Desktop → Clicca "Connetti" dopo un breve delay
+                    setTimeout(() => {
+                        console.log('🔗 Auto-connessione Desktop...');
+                        const desktopIframe = document.getElementById('meshcentral-frame');
+                        if (desktopIframe && desktopIframeLoaded) {
+                            try {
+                                const iframeDoc = desktopIframe.contentDocument;
+                                if (iframeDoc) {
+                                    // PRIMA VOLTA: Chiudi tab Utilità se aperto
+                                    if (!window.__utilityTabClosed) {
+                                        window.__utilityTabClosed = true;
+                                        setTimeout(() => {
+                                            console.log('🔧 Chiudo tab Utilità (prima volta)...');
+                                            
+                                            // Cerca pulsante Utilità (DeskToolsButton)
+                                            const utilityBtn = iframeDoc.querySelector('#DeskToolsButton') ||
+                                                             iframeDoc.querySelector('input[value="Utilità"]') ||
+                                                             iframeDoc.querySelector('input[value="Utility"]') ||
+                                                             iframeDoc.querySelector('input[onclick*="toggleDeskTools"]');
+                                            
+                                            if (utilityBtn && utilityBtn.style.display !== 'none') {
+                                                console.log('📍 Pulsante Utilità trovato:', utilityBtn.id, utilityBtn.value);
+                                                utilityBtn.click();
+                                                console.log('✅ Click su pulsante Utilità per chiudere pannello');
+                                            } else {
+                                                console.log('⚠️ Pulsante Utilità non trovato o nascosto');
+                                            }
+                                        }, 1500); // Aspetta 1.5 secondi per essere sicuri che l'iframe sia caricato
+                                    }
+                                    
+                                    const connectBtn = iframeDoc.querySelector('input[value="Desktop"]') ||
+                                                      iframeDoc.querySelector('input[onclick*="connectDesktop"]') ||
+                                                      iframeDoc.querySelector('#connectbutton1');
+                                    if (connectBtn && connectBtn.style.display !== 'none') {
+                                        connectBtn.click();
+                                        console.log('✅ Click su Connetti Desktop');
+                                    }
+                                }
+                            } catch (e) {
+                                console.log('⚠️ Non posso cliccare Connetti:', e.message);
+                            }
+                        }
+                    }, 500); // Delay per dare tempo all'iframe di essere pronto
+                }
+                
+                // Auto-click Connetti per Files
+                if (targetTab === 'file-transfer' && previousTab !== 'file-transfer') {
+                    setTimeout(() => {
+                        console.log('🔗 Auto-connessione Files...');
+                        const filesIframe = document.getElementById('meshcentral-files-frame');
+                        
+                        if (filesIframe && filesIframeLoaded) {
+                            try {
+                                const iframeDoc = filesIframe.contentDocument;
+                                if (iframeDoc) {
+                                    // Pulsanti Files: p13Connect (local files) o p5Connect (remote files)
+                                    const connectBtn = iframeDoc.querySelector('#p13Connect') ||
+                                                      iframeDoc.querySelector('#p5Connect') ||
+                                                      iframeDoc.querySelector('input[id*="p13"][id*="onnect"]') ||
+                                                      iframeDoc.querySelector('input[id*="p5"][id*="onnect"]');
+                                    
+                                    if (connectBtn && connectBtn.style.display !== 'none') {
+                                        console.log('📍 Pulsante Files trovato:', connectBtn.id, connectBtn.value);
+                                        connectBtn.click();
+                                        console.log('✅ Click su Connetti Files');
+                                    } else {
+                                        console.log('⚠️ Pulsante Files (p13Connect/p5Connect) non trovato o nascosto');
+                                    }
+                                }
+                            } catch (e) {
+                                console.log('⚠️ Errore auto-click Files:', e.message);
+                            }
+                        } else {
+                            console.log('⚠️ Files iframe non pronto');
+                        }
+                    }, 500);
                 }
                 
                 // Rimuovi active da tutti
@@ -471,10 +721,10 @@
                     }
                 };
 
-                const api = new JitsiMeetExternalAPI(domain, options);
+                jitsiApi = new JitsiMeetExternalAPI(domain, options);
                 
                 // Nascondi loader SOLO quando l'utente è effettivamente entrato
-                api.addEventListener('videoConferenceJoined', (event) => {
+                jitsiApi.addEventListener('videoConferenceJoined', (event) => {
                     console.log('✅ Utente entrato nel meeting - nascondo loader');
                     document.getElementById('video-loading').classList.add('hidden');
                     updateSessionInfo('Video Call attiva');
@@ -486,10 +736,98 @@
                     document.getElementById('video-loading').classList.add('hidden');
                 }, 10000);
 
-                api.addEventListener('readyToClose', () => {
+                // Listener per messaggio di chiusura dall'operatore (solo partecipante)
+                if (!jitsiIsModerator) {
+                    jitsiApi.addEventListener('endpointTextMessageReceived', (event) => {
+                        try {
+                            const message = JSON.parse(event.data.eventData.text);
+                            if (message.type === 'SESSION_CLOSED_BY_OPERATOR') {
+                                console.log('📢 Ricevuto comando chiusura dall\'operatore');
+                                
+                                // Chiudi meeting
+                                jitsiApi.executeCommand('hangup');
+                                
+                                // Redirect o mostra messaggio
+                                if (redirectUrl) {
+                                    console.log('🔄 Redirect a:', redirectUrl);
+                                    window.location.href = decodeURIComponent(redirectUrl);
+                                } else {
+                                    document.body.innerHTML = `
+                                        <div style="
+                                            display: flex;
+                                            flex-direction: column;
+                                            align-items: center;
+                                            justify-content: center;
+                                            height: 100vh;
+                                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                            color: white;
+                                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                                        ">
+                                            <div style="
+                                                background: white;
+                                                color: #333;
+                                                padding: 40px 60px;
+                                                border-radius: 15px;
+                                                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                                                text-align: center;
+                                            ">
+                                                <h1 style="color: #667eea; margin-bottom: 20px;">👋 Sessione Terminata</h1>
+                                                <p style="font-size: 18px; color: #666;">
+                                                    La sessione è stata chiusa dall'operatore.
+                                                </p>
+                                                <p style="font-size: 14px; color: #999; margin-top: 20px;">
+                                                    Grazie per aver partecipato.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    `;
+                                }
+                            }
+                        } catch (e) {
+                            // Ignora messaggi non JSON o non rilevanti
+                        }
+                    });
+                }
+
+                // Gestione chiusura meeting
+                jitsiApi.addEventListener('readyToClose', () => {
                     console.log('🚪 Meeting terminato');
-                    if (redirectUrl) {
+                    
+                    // Se è partecipante, redirige al redirect_link
+                    if (!jitsiIsModerator && redirectUrl) {
+                        console.log('🔄 Redirect partecipante a:', redirectUrl);
                         window.location.href = decodeURIComponent(redirectUrl);
+                    } else if (!jitsiIsModerator) {
+                        // Partecipante senza redirect_link
+                        document.body.innerHTML = `
+                            <div style="
+                                display: flex;
+                                flex-direction: column;
+                                align-items: center;
+                                justify-content: center;
+                                height: 100vh;
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                color: white;
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                            ">
+                                <div style="
+                                    background: white;
+                                    color: #333;
+                                    padding: 40px 60px;
+                                    border-radius: 15px;
+                                    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                                    text-align: center;
+                                ">
+                                    <h1 style="color: #667eea; margin-bottom: 20px;">👋 Sessione Terminata</h1>
+                                    <p style="font-size: 18px; color: #666;">
+                                        La sessione è stata chiusa dall'operatore.
+                                    </p>
+                                    <p style="font-size: 14px; color: #999; margin-top: 20px;">
+                                        Grazie per aver partecipato.
+                                    </p>
+                                </div>
+                            </div>
+                        `;
                     }
                 });
             };
@@ -523,15 +861,100 @@
                 return;
             }
 
-            console.log('🖥️ Inizializzazione MeshCentral...');
-            console.log('🔗 URL MeshCentral (proxy):', meshUrl);
+            console.log('🖥️ Inizializzazione MeshCentral Desktop...');
             
-            // Carica MeshCentral tramite proxy locale
+            // EARLY INJECTION: Inietta script MULTIPLI durante il caricamento
+            let injectionCount = 0;
+            const maxInjections = 50; // Prova per 500ms (50 * 10ms)
+            
+            const injectBeforeunloadBlocker = (doc, label) => {
+                try {
+                    // Inietta CSS per nascondere tab Utilità
+                    const style = doc.createElement('style');
+                    style.textContent = `
+                        /* Nascondi tab Utilità */
+                        a[href*="p=3"], 
+                        a[onclick*="p=3"],
+                        #MainMenuMyServer,
+                        .tab-utility,
+                        [id*="p3"],
+                        #p3 {
+                            display: none !important;
+                        }
+                    `;
+                    doc.head.appendChild(style);
+                    console.log('🎨 [${label}] CSS injection: tab Utilità nascosto');
+                    
+                    const script = doc.createElement('script');
+                    script.textContent = `
+                        (function() {
+                            console.log('🔧 [${label}] beforeunload blocker attivo');
+                            
+                            // Blocca onbeforeunload
+                            try {
+                                Object.defineProperty(window, 'onbeforeunload', {
+                                    set: function(value) { 
+                                        console.log('⚠️ [BLOCKED] beforeunload set:', typeof value); 
+                                    },
+                                    get: function() { return null; },
+                                    configurable: false
+                                });
+                            } catch (e) {
+                                console.log('⚠️ defineProperty già impostato');
+                            }
+                            
+                            // Blocca addEventListener
+                            if (!window.__beforeunloadBlocked) {
+                                window.__beforeunloadBlocked = true;
+                                const orig = window.addEventListener;
+                                window.addEventListener = function(type, listener, options) {
+                                    if (type === 'beforeunload') { 
+                                        console.log('⚠️ [BLOCKED] addEventListener beforeunload'); 
+                                        return; 
+                                    }
+                                    return orig.call(this, type, listener, options);
+                                };
+                            }
+                            
+                            // Rimuovi continuamente
+                            setInterval(function() {
+                                if (window.onbeforeunload) {
+                                    try {
+                                        window.onbeforeunload = null;
+                                        console.log('🔄 beforeunload rimosso');
+                                    } catch (e) {}
+                                }
+                            }, 50);
+                            
+                            console.log('✅ [${label}] beforeunload blocker completo');
+                        })();
+                    `;
+                    (doc.head || doc.documentElement || doc.body).appendChild(script);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            };
+            
+            const injectScriptEarly = setInterval(() => {
+                try {
+                    const iframeDocument = iframe.contentDocument;
+                    if (iframeDocument && iframeDocument.readyState !== 'uninitialized') {
+                        if (injectBeforeunloadBlocker(iframeDocument, `EARLY-${injectionCount}`)) {
+                            console.log(`✅ Script EARLY iniettato (tentativo ${injectionCount})`);
+                        }
+                    }
+                    injectionCount++;
+                    if (injectionCount >= maxInjections) {
+                        clearInterval(injectScriptEarly);
+                        console.log('🛑 Iniezione EARLY completata');
+                    }
+                } catch (e) { /* Ignora CORS */ }
+            }, 10);
+            
             iframe.src = meshUrl;
             
-            // Nascondi loader dopo 3 secondi (timeout di sicurezza)
             setTimeout(() => {
-                console.log('⏱️ Timeout: nascondo loader MeshCentral');
                 document.getElementById('remote-loading').classList.add('hidden');
                 updateSessionInfo('Controllo Remoto attivo');
             }, 3000);
@@ -541,22 +964,6 @@
                 desktopIframeLoaded = true;
                 document.getElementById('remote-loading').classList.add('hidden');
                 updateSessionInfo('Controllo Remoto caricato - clicca "Desktop" per connettere');
-                
-                // Prova a rimuovere beforeunload event per evitare popup browser
-                try {
-                    const iframeWindow = iframe.contentWindow;
-                    if (iframeWindow) {
-                        // Sovrascrivi beforeunload per non mostrare popup
-                        iframeWindow.onbeforeunload = null;
-                        iframeWindow.addEventListener('beforeunload', function(e) {
-                            // Previeni il popup
-                            delete e['returnValue'];
-                        });
-                        console.log('✅ beforeunload event rimosso da Desktop iframe');
-                    }
-                } catch (e) {
-                    console.log('⚠️ Non posso accedere a iframe window (CORS):', e.message);
-                }
             };
             
             iframe.onerror = () => {
@@ -581,13 +988,10 @@
 
             console.log('📁 Inizializzazione MeshCentral Files...');
             
-            // Costruisci URL per Files (viewmode=13) + path Desktop
-            // Windows: C:\Users\[username]\Desktop
-            // Il path viene URL-encoded
+            // Costruisci URL per Files (viewmode=13)
             let filesUrl = meshUrl.replace('viewmode=11', 'viewmode=13');
             
-            // Aggiungi path per aprire direttamente Desktop
-            // MeshCentral rileva automaticamente il path Desktop dell'utente corrente
+            // Aggiungi path Desktop
             filesUrl += '&path=Desktop';
             
             console.log('🔗 URL Files:', filesUrl);
@@ -605,18 +1009,42 @@
                 filesIframeLoaded = true;
                 document.getElementById('files-loading').classList.add('hidden');
                 
-                // Prova a rimuovere beforeunload event per evitare popup browser
+                // Inietta script per rimuovere beforeunload nell'iframe
                 try {
-                    const iframeWindow = iframe.contentWindow;
-                    if (iframeWindow) {
-                        iframeWindow.onbeforeunload = null;
-                        iframeWindow.addEventListener('beforeunload', function(e) {
-                            delete e['returnValue'];
-                        });
-                        console.log('✅ beforeunload event rimosso da Files iframe');
+                    const iframeDocument = iframe.contentDocument;
+                    
+                    if (iframeDocument) {
+                        const script = iframeDocument.createElement('script');
+                        script.textContent = `
+                            (function() {
+                                console.log('🔧 Script rimozione beforeunload iniettato (Files)');
+                                
+                                Object.defineProperty(window, 'onbeforeunload', {
+                                    set: function(value) {
+                                        console.log('⚠️ Tentativo di impostare beforeunload bloccato (Files)');
+                                    },
+                                    get: function() {
+                                        return null;
+                                    },
+                                    configurable: false
+                                });
+                                
+                                setInterval(function() {
+                                    if (window.onbeforeunload) {
+                                        window.onbeforeunload = null;
+                                    }
+                                }, 500);
+                                
+                                console.log('✅ beforeunload completamente disabilitato (Files)');
+                            })();
+                        `;
+                        iframeDocument.head.appendChild(script);
+                        console.log('✅ Script iniettato in Files iframe');
+                    } else {
+                        console.log('⚠️ Non posso accedere a iframe document (CORS)');
                     }
                 } catch (e) {
-                    console.log('⚠️ Non posso accedere a iframe window (CORS):', e.message);
+                    console.log('⚠️ Errore iniezione script (CORS):', e.message);
                 }
             };
             

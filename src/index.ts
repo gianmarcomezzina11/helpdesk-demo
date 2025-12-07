@@ -354,7 +354,6 @@ function generateMeshCentralConfig(): void {
     settings: {
       cert: `${LOCAL_IP},${hostname}`,
       port: 4000,
-      aliasPort: 4000,
       redirPort: 0,
       allowLoginToken: true,
       allowFraming: true,
@@ -362,7 +361,7 @@ function generateMeshCentralConfig(): void {
       cookieIpCheck: false,  // Disabilita controllo IP per iframe
       sessionTime: 60,
       sessionKey: "MyReallySecretPassword1",
-      certUrl: `${LOCAL_IP}:4000`,
+      certUrl: `https://${LOCAL_IP}:3001/meshcentral`,  // URL completo del proxy
       trustedProxy: LOCAL_IP,
       agentAllowedIp: "192.168.0.0/16",
       tlsOffload: false,  // Gestisce TLS internamente (no proxy esterno)
@@ -381,20 +380,15 @@ function generateMeshCentralConfig(): void {
     },
     domains: {
       "": {
-        title: "ARPAL Remote Control",
-        title2: "Controllo Remoto ARPAL",
+        title: "Remote Control System",
+        title2: "Controllo Remoto",
         newAccounts: false,
         userNameIsEmail: false,
-        footer: "ARPAL - Agenzia Regionale per la Protezione dell'Ambiente Ligure",
-        certUrl: `${LOCAL_IP}:4000`,
+        footer: "Remote Control & Video Call System",
+        certUrl: `https://${LOCAL_IP}:3001/meshcentral`,  // URL completo del proxy
         guestDeviceSharing: true,
         desktopMultiplex: true,
-        _userConsentFlags: 0,  // FORZA: Nessun consenso (underscore nasconde opzione UI)
-        customUI: {
-          files: {
-            "autoconnect.js": "/meshcentral-autoconnect.js"
-          }
-        }
+        _userConsentFlags: 0  // FORZA: Nessun consenso (underscore nasconde opzione UI)
       }
     }
   };
@@ -538,13 +532,14 @@ async function createMeshGuestLink(nodeId: string): Promise<string | null> {
       return null;
     }
     
-    // URL DIRETTO a MeshCentral con login token
-    // viewmode=11 = device page (mostra pulsante Desktop)
-    // hide=31 = nascondi header (16) + footer (8) + tab bar (4) + title (2) + back button (1) = 31
-    const meshUrl = `${MESHCENTRAL_URL}/?login=${loginToken}&node=${nodeId}&viewmode=11&hide=31`;
+    // URL tramite REVERSE PROXY (stessa porta 3001 = No CORS!)
+    // /meshcentral/ viene proxato a https://localhost:4000/
+    // viewmode=11 = device page (mostra pulsanti Desktop/Files)
+    // hide=127 = nascondi tutto (tutti i bit attivi: 1+2+4+8+16+32+64)
+    const meshUrl = `${SERVER_URL}/meshcentral/?login=${loginToken}&node=${nodeId}&viewmode=11&hide=127`;
     
-    console.error(`🔗 URL MeshCentral con login token per node: ${nodeId.substring(0, 20)}...`);
-    console.error(`✅ Autenticazione automatica attiva!`);
+    console.error(`🔗 URL MeshCentral (via proxy) per node: ${nodeId.substring(0, 20)}...`);
+    console.error(`✅ Autenticazione automatica + No CORS!`);
     return meshUrl;
   } catch (error) {
     console.error('❌ Errore creazione link:', error);
@@ -560,7 +555,7 @@ async function main() {
   
   // Rileva automaticamente l'IP locale e inizializza variabili globali
   LOCAL_IP = getLocalIP();
-  const MESHCENTRAL_PORT = 4000;
+  const MESHCENTRAL_PORT = 4000;  // Porta standard per agent
   MESHCENTRAL_URL = `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`;
   SERVER_URL = `https://${LOCAL_IP}:${HTTPS_PORT}`;  // HTTPS per iframe
   
@@ -581,6 +576,21 @@ async function main() {
     })
   );
   app.use(express.json());
+
+  // Reverse Proxy per MeshCentral (porta 4000 -> /meshcentral/ su porta 3001)
+  // Questo permette di servire MeshCentral sulla stessa porta dell'app = No CORS!
+  // Gli agent si connettono direttamente a porta 4000
+  app.use('/meshcentral', createProxyMiddleware({
+    target: `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`,
+    changeOrigin: true,
+    secure: false,  // Accetta certificati self-signed
+    ws: true,  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
+    pathRewrite: {
+      '^/meshcentral': ''  // Rimuovi /meshcentral dal path
+    }
+  }));
+  
+  console.error('✅ Reverse proxy MeshCentral: /meshcentral/* -> porta 4000');
 
   // MCP endpoint - POST for client-to-server messages
   app.post("/mcp", async (req: Request, res: Response) => {
