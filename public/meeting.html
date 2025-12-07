@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting Jitsi</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: #ffffff;
+        }
+        #meet {
+            width: 100vw;
+            height: 100vh;
+            display: none;
+        }
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        #loading.hidden {
+            display: none;
+        }
+        .logo-container {
+            margin-bottom: 40px;
+            animation: fadeIn 0.8s ease-in;
+        }
+        .logo-container img {
+            max-width: 300px;
+            height: auto;
+        }
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(0, 0, 0, 0.1);
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        .loading-text {
+            color: #333333;
+            font-size: 18px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        .error-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 400px;
+            text-align: center;
+        }
+        .error-container h2 {
+            color: #e74c3c;
+            margin-top: 0;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="logo-container">
+            <img src="/img/ARPAL 1 COLORI.jpg" alt="ARPAL Logo">
+        </div>
+        <div class="loader"></div>
+        <div class="loading-text">Caricamento meeting...</div>
+    </div>
+    <div id="meet"></div>
+
+    <script>
+        // Leggi parametri dall'URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const appId = urlParams.get('appId');
+        const roomName = urlParams.get('room');
+        const jwt = urlParams.get('jwt');
+        const redirectUrl = urlParams.get('redirect');
+        const isModerator = urlParams.get('isModerator') === 'true';
+        
+        console.log('🔑 Parametri URL:');
+        console.log('  - AppID:', appId);
+        console.log('  - Room:', roomName);
+        console.log('  - JWT presente:', jwt ? 'Sì' : 'No');
+        console.log('  - È moderatore:', isModerator);
+
+        if (!appId || !roomName || !jwt) {
+            document.getElementById('loading').innerHTML = 
+                '<div class="error-container"><h2>Errore</h2><p>Parametri mancanti nell\'URL</p></div>';
+        } else {
+            // Carica lo script external_api.js dinamicamente
+            const script = document.createElement('script');
+            script.src = `https://8x8.vc/${appId}/external_api.js`;
+            script.onload = initJitsi;
+            script.onerror = () => {
+                document.getElementById('loading').innerHTML = 
+                    '<div class="error-container"><h2>Errore</h2><p>Impossibile caricare Jitsi</p></div>';
+            };
+            document.head.appendChild(script);
+        }
+
+        function initJitsi() {
+            console.log('Inizializzazione Jitsi...');
+            console.log('AppID:', appId);
+            console.log('Room:', roomName);
+            console.log('JWT presente:', jwt ? 'Si' : 'No');
+            
+            const domain = '8x8.vc';
+            const options = {
+                roomName: `${appId}/${roomName}`,
+                jwt: jwt,
+                width: '100%',
+                height: '100%',
+                parentNode: document.querySelector('#meet'),
+                configOverwrite: {
+                    prejoinPageEnabled: false,
+                    startWithAudioMuted: false,
+                    startWithVideoMuted: false,
+                    enableClosePage: true,
+                    disableDeepLinking: true,
+                    defaultLocalDisplayName: 'Me',
+                    hideConferenceSubject: false,
+                    enableWelcomePage: false,
+                    enableUserRolesBasedOnToken: true,
+                    disableModeratorIndicator: false,
+                    prejoinConfig: {
+                        enabled: false
+                    },
+                    // Disabilita condivisione schermo
+                    disableScreensharingVirtualBackground: true,
+                    // Disabilita funzioni di invito
+                    disableInviteFunctions: true,
+                    // Rimuovi bottoni dalla toolbar
+                    toolbarButtons: [
+                        'camera',
+                        'chat',
+                        'closedcaptions',
+                        'filmstrip',
+                        'fullscreen',
+                        'hangup',
+                        'microphone',
+                        'participants-pane',
+                        'profile',
+                        'raisehand',
+                        'settings',
+                        'tileview',
+                        'toggle-camera',
+                        'videoquality'
+                    ]
+                },
+                interfaceConfigOverwrite: {
+                    SHOW_JITSI_WATERMARK: false,
+                    SHOW_WATERMARK_FOR_GUESTS: false,
+                    SHOW_BRAND_WATERMARK: false,
+                    SHOW_POWERED_BY: false,
+                    DISPLAY_WELCOME_FOOTER: false,
+                    DEFAULT_BACKGROUND: '#474747',
+                    DISABLE_VIDEO_BACKGROUND: false,
+                    INITIAL_TOOLBAR_TIMEOUT: 20000,
+                    TOOLBAR_TIMEOUT: 4000,
+                    TOOLBAR_ALWAYS_VISIBLE: false,
+                    DEFAULT_REMOTE_DISPLAY_NAME: 'Partecipante',
+                    DEFAULT_LOCAL_DISPLAY_NAME: 'Me',
+                    SHOW_CHROME_EXTENSION_BANNER: false
+                }
+            };
+
+            console.log('Opzioni complete:', JSON.stringify(options, null, 2));
+            console.log('Creazione JitsiMeetExternalAPI...');
+            
+            const api = new JitsiMeetExternalAPI(domain, options);
+            
+            console.log('API creata con successo');
+
+            // Variabile per tracciare i partecipanti
+            let participants = {};
+            let localParticipantId = null;
+            let moderatorId = null; // ID del moderatore nella stanza
+            
+            console.log('🎭 Questo utente è moderatore:', isModerator);
+
+            // Gestione eventi
+            api.addEventListener('videoConferenceJoined', (event) => {
+                console.log('🎉 Utente entrato nel meeting', event);
+                localParticipantId = event.id;
+                
+                // Se questo utente è il moderatore, salva il suo ID
+                if (isModerator) {
+                    moderatorId = event.id;
+                    console.log('👑 Questo utente è il MODERATORE con ID:', moderatorId);
+                }
+                
+                // Nascondi loader e mostra meeting
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('meet').style.display = 'block';
+                
+                // Forza apertura chat dopo 1 secondo
+                setTimeout(() => {
+                    api.executeCommand('toggleChat');
+                }, 1000);
+            });
+
+            // Traccia i partecipanti che entrano
+            api.addEventListener('participantJoined', (event) => {
+                console.log('👋 Partecipante entrato:', event);
+                participants[event.id] = event;
+                
+                // Se questo è il moderatore, invia un messaggio broadcast per far sapere a tutti chi è
+                if (isModerator) {
+                    setTimeout(() => {
+                        console.log('📢 Invio broadcast: IO SONO IL MODERATORE');
+                        api.executeCommand('sendEndpointTextMessage', '', JSON.stringify({
+                            type: 'MODERATOR_ID',
+                            moderatorId: localParticipantId
+                        }));
+                    }, 1000);
+                }
+            });
+
+            // Ascolta messaggi dagli altri partecipanti
+            api.addEventListener('endpointTextMessageReceived', (event) => {
+                console.log('📨 Messaggio ricevuto:', event);
+                try {
+                    const message = JSON.parse(event.data.eventData.text);
+                    if (message.type === 'MODERATOR_ID') {
+                        moderatorId = message.moderatorId;
+                        console.log('📝 Moderatore identificato con ID:', moderatorId);
+                    } else if (message.type === 'MODERATOR_LEFT') {
+                        console.log('🚨 RICEVUTO SEGNALE: MODERATORE USCITO!');
+                        alert('Il moderatore ha terminato il meeting. La riunione verrà chiusa.');
+                        setTimeout(() => {
+                            api.executeCommand('hangup');
+                        }, 1000);
+                    }
+                } catch (e) {
+                    console.error('Errore parsing messaggio:', e);
+                }
+            });
+
+            // Gestione uscita partecipanti
+            api.addEventListener('participantLeft', (event) => {
+                console.log('🚪 Partecipante uscito:', event.id);
+                
+                // Se il partecipante uscito è il moderatore
+                if (event.id === moderatorId) {
+                    console.log('🚨 IL MODERATORE È USCITO!');
+                    console.log('⚠️ Chiusura meeting per tutti i partecipanti...');
+                    
+                    // Mostra messaggio
+                    alert('Il moderatore ha terminato il meeting. La riunione verrà chiusa.');
+                    
+                    // Chiudi il meeting per questo partecipante
+                    setTimeout(() => {
+                        api.executeCommand('hangup');
+                    }, 1000);
+                }
+                
+                // Rimuovi dalla lista
+                delete participants[event.id];
+            });
+
+            // Quando un utente sta per uscire
+            api.addEventListener('readyToClose', () => {
+                console.log('🚪 Questo utente sta per uscire');
+                
+                // Se è il moderatore, invia un broadcast prima di uscire
+                if (isModerator) {
+                    console.log('👑 Sono il moderatore, invio segnale di chiusura a tutti');
+                    api.executeCommand('sendEndpointTextMessage', '', JSON.stringify({
+                        type: 'MODERATOR_LEFT'
+                    }));
+                }
+                
+                // Redirect o messaggio di chiusura
+                setTimeout(() => {
+                    console.log('Meeting terminato');
+                    if (redirectUrl) {
+                        window.location.href = decodeURIComponent(redirectUrl);
+                    } else {
+                        document.getElementById('meet').innerHTML = 
+                            '<div style="text-align:center;padding-top:50px;"><h2>Meeting terminato</h2><p>Puoi chiudere questa finestra</p></div>';
+                    }
+                }, 500);
+            });
+        }
+    </script>
+</body>
+</html>

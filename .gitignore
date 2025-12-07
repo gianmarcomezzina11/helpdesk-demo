@@ -1,0 +1,21 @@
+node_modules/
+build/
+*.log
+.DS_Store
+.env
+
+# MeshCentral
+meshcentral-data/
+meshcentral-config.json
+meshcentral-files/
+*.db
+*.db-*
+
+# Certificati
+*.crt
+*.key
+*.pem
+
+# Backup
+*.backup
+*.bak

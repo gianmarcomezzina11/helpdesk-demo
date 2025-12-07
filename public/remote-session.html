@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sessione Remota ARPAL</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: white;
+        }
+
+        /* Header con logo */
+        .header {
+            background: white;
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 100;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-container img {
+            height: 50px;
+            width: auto;
+        }
+
+        .session-info {
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Tab Navigation */
+        .tab-navigation {
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            padding: 0 30px;
+        }
+
+        .tab-button {
+            background: transparent;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 500;
+            color: #6c757d;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tab-button:hover {
+            color: #495057;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .tab-button.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            background: white;
+        }
+
+        .tab-icon {
+            font-size: 20px;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tab-pane {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease;
+        }
+
+        .tab-pane.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Video Call Container */
+        #video-call-container {
+            width: 100%;
+            height: 100%;
+            background: #1a1a1a;
+        }
+
+        #jitsi-meet {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Remote Control Container */
+        #remote-control-container {
+            width: 100%;
+            height: 100%;
+            background: #2c3e50;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #meshcentral-frame,
+        #meshcentral-files-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+            /* MeshCentral gestisce lo scaling internamente */
+        }
+        
+        #file-transfer-container {
+            position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #file-transfer-container .info-panel {
+            flex-shrink: 0;
+        }
+        
+        #file-transfer-container iframe {
+            flex: 1;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(102, 126, 234, 0.2);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            color: #667eea;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        /* Error Message */
+        .error-message {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px;
+            color: #856404;
+        }
+
+        .error-message h3 {
+            margin-bottom: 10px;
+            color: #856404;
+        }
+
+        /* Info Panel */
+        .info-panel {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 20px;
+            border-radius: 4px;
+        }
+
+        .info-panel h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .info-panel p {
+            color: #0d47a1;
+            line-height: 1.6;
+        }
+
+        .info-panel code {
+            background: rgba(33, 150, 243, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo-container">
+                <img src="/img/ARPAL 1 COLORI.jpg" alt="ARPAL Logo">
+                <h2 style="color: #667eea;">Sessione Remota</h2>
+            </div>
+            <div class="session-info" id="session-info">
+                Caricamento...
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-button active" data-tab="video-call">
+                <span class="tab-icon">📹</span>
+                Video Call
+            </button>
+            <button class="tab-button" data-tab="remote-control" id="desktop-tab">
+                <span class="tab-icon">🖥️</span>
+                Controllo Remoto
+            </button>
+            <button class="tab-button" data-tab="file-transfer" id="files-tab">
+                <span class="tab-icon">📁</span>
+                Trasferimento File
+            </button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- Video Call Tab -->
+            <div class="tab-pane active" id="video-call-pane">
+                <div class="loading-overlay" id="video-loading">
+                    <div class="spinner"></div>
+                    <div class="loading-text">Caricamento Video Call...</div>
+                </div>
+                <div id="video-call-container">
+                    <div id="jitsi-meet"></div>
+                </div>
+            </div>
+
+            <!-- Remote Control Tab -->
+            <div class="tab-pane" id="remote-control-pane">
+                <div class="loading-overlay" id="remote-loading">
+                    <div class="spinner"></div>
+                    <div class="loading-text">Caricamento Controllo Remoto...</div>
+                </div>
+                <div id="remote-control-container">
+                    <iframe 
+                        id="meshcentral-frame" 
+                        allow="clipboard-read; clipboard-write"
+                    ></iframe>
+                </div>
+            </div>
+
+            <!-- File Transfer Tab -->
+            <div class="tab-pane" id="file-transfer-pane">
+                <div class="loading-overlay" id="files-loading">
+                    <div class="spinner"></div>
+                    <div class="loading-text">Caricamento File Manager...</div>
+                </div>
+                <div class="info-panel">
+                    <h4>📁 Trasferimento File</h4>
+                    <p>
+                        • <strong>Drag & Drop:</strong> Trascina file dal tuo PC nella finestra per caricarli<br>
+                        • <strong>Download:</strong> Clicca su un file per scaricarlo<br>
+                        • <strong>Cartelle:</strong> Naviga nel filesystem del PC remoto<br>
+                        • <strong>⚠️ Importante:</strong> Chiudi Desktop prima di usare File Transfer per evitare conflitti
+                    </p>
+                </div>
+                <div id="file-transfer-container">
+                    <iframe 
+                        id="meshcentral-files-frame" 
+                        allow="clipboard-read; clipboard-write"
+                    ></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Parametri URL
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Parametri Jitsi
+        const jitsiAppId = urlParams.get('appId');
+        const jitsiRoom = urlParams.get('room');
+        const jitsiJwt = urlParams.get('jwt');
+        const jitsiIsModerator = urlParams.get('isModerator') === 'true';
+        const redirectUrl = urlParams.get('redirect');
+        
+        // Parametri MeshCentral
+        const meshUrl = urlParams.get('meshUrl');
+        const meshLoginToken = urlParams.get('meshToken');
+        const meshNodeId = urlParams.get('meshNode');
+        
+        console.log('🔧 Parametri ricevuti:', {
+            jitsi: { appId: jitsiAppId, room: jitsiRoom, haJwt: !!jitsiJwt, isModerator: jitsiIsModerator },
+            mesh: { url: meshUrl, hasToken: !!meshLoginToken, nodeId: meshNodeId }
+        });
+        
+        // Nascondi tab MeshCentral se non presente meshUrl (per partecipanti)
+        if (!meshUrl) {
+            console.log('👤 Modalità Partecipante - Solo Video Call');
+            const remoteTab = document.querySelector('[data-tab="remote-control"]');
+            const filesTab = document.querySelector('[data-tab="file-transfer"]');
+            if (remoteTab) remoteTab.style.display = 'none';
+            if (filesTab) filesTab.style.display = 'none';
+        } else {
+            console.log('👨‍💼 Modalità Operatore - Video Call + Controllo Remoto + File Transfer');
+        }
+
+        // Variabili per tracking iframe attivi
+        let desktopIframeLoaded = false;
+        let filesIframeLoaded = false;
+        let currentActiveTab = 'video-call';
+
+        // Gestione Tab con Disconnessione Automatica
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabPanes = document.querySelectorAll('.tab-pane');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = button.dataset.tab;
+                const previousTab = currentActiveTab;
+                
+                console.log(`🔄 Cambio tab: ${previousTab} → ${targetTab}`);
+                
+                // LOGICA DISCONNESSIONE AUTOMATICA
+                if (previousTab === 'remote-control' && targetTab !== 'remote-control') {
+                    // Uscendo da Desktop → Ricarica iframe per disconnettere
+                    console.log('🔌 Disconnetto Desktop...');
+                    const desktopIframe = document.getElementById('meshcentral-frame');
+                    if (desktopIframe && desktopIframeLoaded) {
+                        const currentSrc = desktopIframe.src;
+                        desktopIframe.src = 'about:blank';
+                        setTimeout(() => {
+                            desktopIframe.src = currentSrc;
+                            desktopIframeLoaded = false;
+                        }, 100);
+                    }
+                }
+                
+                if (previousTab === 'file-transfer' && targetTab !== 'file-transfer') {
+                    // Uscendo da Files → Ricarica iframe per disconnettere
+                    console.log('🔌 Disconnetto File Transfer...');
+                    const filesIframe = document.getElementById('meshcentral-files-frame');
+                    if (filesIframe && filesIframeLoaded) {
+                        const currentSrc = filesIframe.src;
+                        filesIframe.src = 'about:blank';
+                        setTimeout(() => {
+                            filesIframe.src = currentSrc;
+                            filesIframeLoaded = false;
+                        }, 100);
+                    }
+                }
+                
+                // Rimuovi active da tutti
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabPanes.forEach(pane => pane.classList.remove('active'));
+                
+                // Aggiungi active al selezionato
+                currentActiveTab = targetTab;
+                button.classList.add('active');
+                document.getElementById(`${targetTab}-pane`).classList.add('active');
+                
+                console.log(`📑 Cambio tab: ${targetTab}`);
+            });
+        });
+
+        // Inizializza Jitsi
+        function initJitsi() {
+            if (!jitsiAppId || !jitsiRoom || !jitsiJwt) {
+                console.error('❌ Parametri Jitsi mancanti');
+                document.getElementById('video-loading').innerHTML = `
+                    <div class="error-message">
+                        <h3>⚠️ Errore Configurazione Video Call</h3>
+                        <p>Parametri Jitsi mancanti. Verifica la configurazione.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            console.log('🎥 Inizializzazione Jitsi...');
+            
+            // Carica script Jitsi
+            const script = document.createElement('script');
+            script.src = `https://8x8.vc/${jitsiAppId}/external_api.js`;
+            script.onload = () => {
+                console.log('✅ Script Jitsi caricato');
+                
+                const domain = '8x8.vc';
+                const options = {
+                    roomName: `${jitsiAppId}/${jitsiRoom}`,
+                    jwt: jitsiJwt,
+                    width: '100%',
+                    height: '100%',
+                    parentNode: document.querySelector('#jitsi-meet'),
+                    userInfo: {
+                        displayName: jitsiIsModerator ? 'Operatore' : 'Partecipante'
+                    },
+                    configOverwrite: {
+                        prejoinPageEnabled: false,  // Disabilita pre-join
+                        prejoinConfig: {
+                            enabled: false  // Forza disabilitazione pre-join
+                        },
+                        startWithAudioMuted: true,  // Audio disabilitato
+                        startWithVideoMuted: false, // Video attivo
+                        enableClosePage: true,
+                        disableDeepLinking: true,
+                        requireDisplayName: false,  // Non richiedere nome
+                        enableWelcomePage: false,   // No welcome page
+                        enableUserRolesBasedOnToken: true,
+                        toolbarButtons: [
+                            'camera', 'chat', 'closedcaptions', 'desktop',
+                            'filmstrip', 'fullscreen', 'hangup', 'microphone',
+                            'participants-pane', 'profile', 'raisehand',
+                            'settings', 'tileview', 'toggle-camera', 'videoquality'
+                        ]
+                    },
+                    interfaceConfigOverwrite: {
+                        SHOW_JITSI_WATERMARK: false,
+                        SHOW_WATERMARK_FOR_GUESTS: false,
+                        SHOW_BRAND_WATERMARK: false,
+                        TOOLBAR_ALWAYS_VISIBLE: false,
+                        DISABLE_JOIN_LEAVE_NOTIFICATIONS: true
+                    }
+                };
+
+                const api = new JitsiMeetExternalAPI(domain, options);
+                
+                // Nascondi loader SOLO quando l'utente è effettivamente entrato
+                api.addEventListener('videoConferenceJoined', (event) => {
+                    console.log('✅ Utente entrato nel meeting - nascondo loader');
+                    document.getElementById('video-loading').classList.add('hidden');
+                    updateSessionInfo('Video Call attiva');
+                });
+                
+                // Timeout di sicurezza (10 secondi)
+                setTimeout(() => {
+                    console.log('⏱️ Timeout sicurezza: nascondo loader');
+                    document.getElementById('video-loading').classList.add('hidden');
+                }, 10000);
+
+                api.addEventListener('readyToClose', () => {
+                    console.log('🚪 Meeting terminato');
+                    if (redirectUrl) {
+                        window.location.href = decodeURIComponent(redirectUrl);
+                    }
+                });
+            };
+            
+            script.onerror = () => {
+                console.error('❌ Errore caricamento Jitsi');
+                document.getElementById('video-loading').innerHTML = `
+                    <div class="error-message">
+                        <h3>⚠️ Errore Caricamento</h3>
+                        <p>Impossibile caricare Jitsi. Verifica la connessione.</p>
+                    </div>
+                `;
+            };
+            
+            document.head.appendChild(script);
+        }
+
+        // Inizializza MeshCentral
+        function initMeshCentral() {
+            const iframe = document.getElementById('meshcentral-frame');
+            
+            if (!meshUrl) {
+                console.warn('⚠️ URL MeshCentral non configurato');
+                document.getElementById('remote-loading').innerHTML = `
+                    <div class="info-panel">
+                        <h4>📋 Controllo Remoto Non Configurato</h4>
+                        <p>Il controllo remoto non è stato configurato per questa sessione.</p>
+                        <p>Contatta l'amministratore per abilitare questa funzionalità.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            console.log('🖥️ Inizializzazione MeshCentral...');
+            console.log('🔗 URL MeshCentral (proxy):', meshUrl);
+            
+            // Carica MeshCentral tramite proxy locale
+            iframe.src = meshUrl;
+            
+            // Nascondi loader dopo 3 secondi (timeout di sicurezza)
+            setTimeout(() => {
+                console.log('⏱️ Timeout: nascondo loader MeshCentral');
+                document.getElementById('remote-loading').classList.add('hidden');
+                updateSessionInfo('Controllo Remoto attivo');
+            }, 3000);
+            
+            iframe.onload = () => {
+                console.log('✅ MeshCentral Desktop caricato');
+                desktopIframeLoaded = true;
+                document.getElementById('remote-loading').classList.add('hidden');
+                updateSessionInfo('Controllo Remoto caricato - clicca "Desktop" per connettere');
+                
+                // Prova a rimuovere beforeunload event per evitare popup browser
+                try {
+                    const iframeWindow = iframe.contentWindow;
+                    if (iframeWindow) {
+                        // Sovrascrivi beforeunload per non mostrare popup
+                        iframeWindow.onbeforeunload = null;
+                        iframeWindow.addEventListener('beforeunload', function(e) {
+                            // Previeni il popup
+                            delete e['returnValue'];
+                        });
+                        console.log('✅ beforeunload event rimosso da Desktop iframe');
+                    }
+                } catch (e) {
+                    console.log('⚠️ Non posso accedere a iframe window (CORS):', e.message);
+                }
+            };
+            
+            iframe.onerror = () => {
+                console.error('❌ Errore caricamento MeshCentral Desktop');
+                document.getElementById('remote-loading').innerHTML = `
+                    <div class="error-message">
+                        <h3>⚠️ Errore Caricamento</h3>
+                        <p>Impossibile caricare MeshCentral Desktop.</p>
+                    </div>
+                `;
+            };
+        }
+
+        // Inizializza MeshCentral Files
+        function initMeshFiles() {
+            const iframe = document.getElementById('meshcentral-files-frame');
+            
+            if (!meshUrl) {
+                console.warn('⚠️ URL MeshCentral non configurato');
+                return;
+            }
+
+            console.log('📁 Inizializzazione MeshCentral Files...');
+            
+            // Costruisci URL per Files (viewmode=13) + path Desktop
+            // Windows: C:\Users\[username]\Desktop
+            // Il path viene URL-encoded
+            let filesUrl = meshUrl.replace('viewmode=11', 'viewmode=13');
+            
+            // Aggiungi path per aprire direttamente Desktop
+            // MeshCentral rileva automaticamente il path Desktop dell'utente corrente
+            filesUrl += '&path=Desktop';
+            
+            console.log('🔗 URL Files:', filesUrl);
+            
+            iframe.src = filesUrl;
+            
+            // Nascondi loader dopo 3 secondi (timeout di sicurezza)
+            setTimeout(() => {
+                console.log('⏱️ Timeout: nascondo loader Files');
+                document.getElementById('files-loading').classList.add('hidden');
+            }, 3000);
+            
+            iframe.onload = () => {
+                console.log('✅ MeshCentral Files caricato');
+                filesIframeLoaded = true;
+                document.getElementById('files-loading').classList.add('hidden');
+                
+                // Prova a rimuovere beforeunload event per evitare popup browser
+                try {
+                    const iframeWindow = iframe.contentWindow;
+                    if (iframeWindow) {
+                        iframeWindow.onbeforeunload = null;
+                        iframeWindow.addEventListener('beforeunload', function(e) {
+                            delete e['returnValue'];
+                        });
+                        console.log('✅ beforeunload event rimosso da Files iframe');
+                    }
+                } catch (e) {
+                    console.log('⚠️ Non posso accedere a iframe window (CORS):', e.message);
+                }
+            };
+            
+            iframe.onerror = () => {
+                console.error('❌ Errore caricamento MeshCentral Files');
+                document.getElementById('files-loading').innerHTML = `
+                    <div class="error-message">
+                        <h3>⚠️ Errore Caricamento</h3>
+                        <p>Impossibile caricare MeshCentral Files.</p>
+                    </div>
+                `;
+            };
+        }
+
+        // Aggiorna info sessione
+        function updateSessionInfo(text) {
+            document.getElementById('session-info').textContent = text;
+        }
+
+        // Inizializzazione
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 Inizializzazione applicazione...');
+            updateSessionInfo('Inizializzazione...');
+            
+            // Inizializza tutti i componenti
+            initJitsi();
+            initMeshCentral();
+            initMeshFiles();
+        });
+    </script>
+</body>
+</html>
