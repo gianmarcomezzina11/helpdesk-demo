@@ -550,18 +550,26 @@ async function createMeshGuestLink(nodeId: string): Promise<string | null> {
 // Start the HTTP server with Streamable HTTP transport
 async function main() {
   const app = express();
-  const HTTP_PORT = process.env.PORT || 3000;  // HTTP per MCP
-  const HTTPS_PORT = 3001;  // HTTPS per web app
+  const PORT = process.env.PORT || 3000;  // Porta unificata (Azure usa 8080)
+  const IS_AZURE = process.env.WEBSITE_INSTANCE_ID !== undefined;  // Detect Azure
   
   // Rileva automaticamente l'IP locale e inizializza variabili globali
-  LOCAL_IP = getLocalIP();
+  LOCAL_IP = IS_AZURE ? 'localhost' : getLocalIP();
   const MESHCENTRAL_PORT = 4000;  // Porta standard per agent
-  MESHCENTRAL_URL = `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`;
-  SERVER_URL = `https://${LOCAL_IP}:${HTTPS_PORT}`;  // HTTPS per iframe
   
-  console.error(`\n🌐 IP locale rilevato: ${LOCAL_IP}`);
-  console.error(`📡 Server HTTPS (Web): ${SERVER_URL}`);
-  console.error(`📡 Server HTTP (MCP): http://${LOCAL_IP}:${HTTP_PORT}`);
+  // In Azure, usa il dominio pubblico invece di IP locale
+  if (IS_AZURE) {
+    const azureDomain = process.env.WEBSITE_HOSTNAME || 'localhost';
+    MESHCENTRAL_URL = `https://${azureDomain}/meshcentral-internal`;
+    SERVER_URL = `https://${azureDomain}`;
+  } else {
+    MESHCENTRAL_URL = `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`;
+    SERVER_URL = `https://${LOCAL_IP}:${PORT}`;
+  }
+  
+  console.error(`\n🌐 Ambiente: ${IS_AZURE ? 'Azure App Service' : 'Locale'}`);
+  console.error(`📡 Server URL: ${SERVER_URL}`);
+  console.error(`📡 Porta: ${PORT}`);
   console.error(`🖥️  MeshCentral URL: ${MESHCENTRAL_URL}\n`);
 
   // Serve static files from public directory
@@ -928,46 +936,63 @@ async function main() {
   // Inizializza MeshCentral
   const meshEnabled = initMeshCentral();
 
-  // AVVIA SERVER HTTP per MCP (porta 3000)
-  app.listen(HTTP_PORT, () => {
-    console.error(`\n🚀 ========================================`);
-    console.error(`   MCP Jitsi + MeshCentral Server`);
-    console.error(`========================================`);
-    console.error(`📹 Jitsi Server (HTTPS): ${SERVER_URL}`);
-    console.error(`🔧 MCP endpoint (HTTP): http://${LOCAL_IP}:${HTTP_PORT}/mcp`);
-    console.error(`💚 Health check: http://${LOCAL_IP}:${HTTP_PORT}/health`);
-    if (meshEnabled) {
-      console.error(`🖥️  MeshCentral: ${MESHCENTRAL_URL}`);
-    } else {
-      console.error(`⚠️  MeshCentral: Non disponibile`);
-    }
-    console.error(`========================================\n`);
-    console.error(`🛠️  Tool disponibile: create_video_meeting`);
-    if (meshEnabled) {
-      console.error(`🔑 MeshCentral integrato e pronto`);
-    }
-  });
-
-  // AVVIA SERVER HTTPS per Web App (porta 3001)
-  // Usa i certificati di MeshCentral
-  const certPath = path.join(process.cwd(), 'meshcentral-data', 'webserver-cert-public.crt');
-  const keyPath = path.join(process.cwd(), 'meshcentral-data', 'webserver-cert-private.key');
-  
-  // Attendi che MeshCentral generi i certificati
-  const waitForCerts = setInterval(() => {
-    if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
-      clearInterval(waitForCerts);
-      
-      const httpsOptions = {
-        cert: fs.readFileSync(certPath),
-        key: fs.readFileSync(keyPath)
-      };
-      
-      https.createServer(httpsOptions, app).listen(HTTPS_PORT, () => {
-        console.error(`🔒 Server HTTPS attivo su porta ${HTTPS_PORT} per iframe sicuro!`);
-      });
-    }
-  }, 1000);
+  // AVVIA SERVER UNIFICATO (HTTP in locale, HTTPS gestito da Azure in produzione)
+  if (IS_AZURE) {
+    // In Azure, usa solo HTTP - Azure gestisce HTTPS
+    app.listen(PORT, () => {
+      console.error(`\n🚀 ========================================`);
+      console.error(`   MCP Jitsi + MeshCentral Server (Azure)`);
+      console.error(`========================================`);
+      console.error(`📹 Server URL: ${SERVER_URL}`);
+      console.error(`🔧 MCP endpoint: ${SERVER_URL}/mcp`);
+      console.error(`💚 Health check: ${SERVER_URL}/health`);
+      if (meshEnabled) {
+        console.error(`🖥️  MeshCentral: ${MESHCENTRAL_URL}`);
+      } else {
+        console.error(`⚠️  MeshCentral: Non disponibile`);
+      }
+      console.error(`========================================\n`);
+      console.error(`🛠️  Tool disponibile: create_video_meeting`);
+      if (meshEnabled) {
+        console.error(`🔑 MeshCentral integrato e pronto`);
+      }
+    });
+  } else {
+    // In locale, usa HTTPS con certificati MeshCentral
+    const certPath = path.join(process.cwd(), 'meshcentral-data', 'webserver-cert-public.crt');
+    const keyPath = path.join(process.cwd(), 'meshcentral-data', 'webserver-cert-private.key');
+    
+    // Attendi che MeshCentral generi i certificati
+    const waitForCerts = setInterval(() => {
+      if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+        clearInterval(waitForCerts);
+        
+        const httpsOptions = {
+          cert: fs.readFileSync(certPath),
+          key: fs.readFileSync(keyPath)
+        };
+        
+        https.createServer(httpsOptions, app).listen(PORT, () => {
+          console.error(`\n🚀 ========================================`);
+          console.error(`   MCP Jitsi + MeshCentral Server (Locale)`);
+          console.error(`========================================`);
+          console.error(`� Server URL: ${SERVER_URL}`);
+          console.error(`🔧 MCP endpoint: ${SERVER_URL}/mcp`);
+          console.error(`💚 Health check: ${SERVER_URL}/health`);
+          if (meshEnabled) {
+            console.error(`🖥️  MeshCentral: ${MESHCENTRAL_URL}`);
+          } else {
+            console.error(`⚠️  MeshCentral: Non disponibile`);
+          }
+          console.error(`========================================\n`);
+          console.error(`🛠️  Tool disponibile: create_video_meeting`);
+          if (meshEnabled) {
+            console.error(`🔑 MeshCentral integrato e pronto`);
+          }
+        });
+      }
+    }, 1000);
+  }
 }
 
 main().catch((error) => {

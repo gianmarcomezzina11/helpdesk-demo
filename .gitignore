@@ -1,21 +1,43 @@
+# Dependencies
 node_modules/
-build/
-*.log
-.DS_Store
-.env
 
-# MeshCentral
+# Build output
+build/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.production
+
+# MeshCentral (reinstallato ad ogni deploy)
 meshcentral-data/
 meshcentral-config.json
 meshcentral-files/
+meshcentral-backups/
 *.db
 *.db-*
+*.db-journal
 
-# Certificati
+# Certificati (generati automaticamente)
 *.crt
 *.key
 *.pem
+*.pfx
 
 # Backup
 *.backup
 *.bak
+
+# Azure
+.azure/
