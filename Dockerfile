@@ -1,8 +1,9 @@
 # Dockerfile per MCP Jitsi + MeshCentral su Azure App Service Container
 FROM node:18-alpine
 
-# Installa dipendenze di sistema per MeshCentral
+# Installa dipendenze di sistema per MeshCentral e npm
 RUN apk add --no-cache \
+    npm \
     python3 \
     make \
     g++ \
