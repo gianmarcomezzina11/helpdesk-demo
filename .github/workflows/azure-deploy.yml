@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: your-app-name    # Sostituisci con il nome della tua Azure App
+  AZURE_WEBAPP_NAME: aw-demo-helpdesk
   NODE_VERSION: '18.x'
 
 jobs:
