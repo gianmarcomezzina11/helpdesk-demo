@@ -177,7 +177,13 @@ function generateJWT(
   console.error(`   Inizia con: ${formattedPrivateKey.substring(0, 27)}`);
   console.error(`   Finisce con: ${formattedPrivateKey.substring(formattedPrivateKey.length - 25)}`);
 
-  return jwt.sign(payload, formattedPrivateKey, {
+  // Converti la stringa PEM in KeyObject per RS256
+  const privateKeyObject = crypto.createPrivateKey({
+    key: formattedPrivateKey,
+    format: 'pem'
+  });
+
+  return jwt.sign(payload, privateKeyObject, {
     algorithm: "RS256",
     keyid: keyId,
   });
