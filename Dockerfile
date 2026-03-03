@@ -18,15 +18,17 @@ WORKDIR /app
 # Copia package files
 COPY package*.json ./
 
-# Verifica npm e installa dipendenze
-RUN node --version && npm --version
-RUN npm install --production
+# Installa TUTTE le dipendenze (incluso typescript per build)
+RUN npm install
 
 # Copia il resto del codice
 COPY . .
 
 # Build TypeScript
 RUN npm run build
+
+# Rimuovi devDependencies per ridurre dimensione immagine
+RUN npm prune --production
 
 # Crea directory per MeshCentral
 RUN mkdir -p meshcentral-data meshcentral-files
