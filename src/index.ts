@@ -588,7 +588,7 @@ async function main() {
   // Reverse Proxy per MeshCentral (porta 4000 -> /meshcentral/ su porta 3001)
   // Questo permette di servire MeshCentral sulla stessa porta dell'app = No CORS!
   // Gli agent si connettono direttamente a porta 4000
-  app.use('/meshcentral', createProxyMiddleware({
+  const meshProxy = createProxyMiddleware({
     target: `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`,
     changeOrigin: true,
     secure: false,  // Accetta certificati self-signed
@@ -596,7 +596,43 @@ async function main() {
     pathRewrite: {
       '^/meshcentral': ''  // Rimuovi /meshcentral dal path
     }
-  }));
+  });
+  
+  // Wrapper per gestire errori del proxy
+  app.use('/meshcentral', (req: Request, res: Response, next) => {
+    console.error(`🔄 Proxy request: ${req.method} ${req.url}`);
+    
+    // Timeout per evitare hang
+    const timeout = setTimeout(() => {
+      if (!res.headersSent) {
+        console.error('⏱️ Timeout proxy MeshCentral');
+        res.status(503).send(`
+          <html>
+            <head><title>MeshCentral Non Disponibile</title></head>
+            <body style="font-family: Arial; padding: 50px; text-align: center;">
+              <h1>🔧 MeshCentral Non Disponibile</h1>
+              <p>MeshCentral si sta ancora avviando o non è raggiungibile.</p>
+              <p>Attendi 30-60 secondi e ricarica la pagina.</p>
+              <p><a href="/meshcentral">Ricarica</a></p>
+            </body>
+          </html>
+        `);
+      }
+    }, 10000); // 10 secondi timeout
+    
+    res.on('finish', () => clearTimeout(timeout));
+    res.on('close', () => clearTimeout(timeout));
+    
+    try {
+      meshProxy(req, res, next);
+    } catch (error) {
+      clearTimeout(timeout);
+      console.error('❌ Errore proxy MeshCentral:', error);
+      if (!res.headersSent) {
+        res.status(503).send('MeshCentral non disponibile');
+      }
+    }
+  });
   
   console.error('✅ Reverse proxy MeshCentral: /meshcentral/* -> porta 4000');
 
