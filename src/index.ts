@@ -177,26 +177,21 @@ function generateJWT(
   console.error(`   Inizia con: ${formattedPrivateKey.substring(0, 27)}`);
   console.error(`   Finisce con: ${formattedPrivateKey.substring(formattedPrivateKey.length - 25)}`);
 
+  // Per jsonwebtoken 9.x con RS256, usa oggetto con key e passphrase
+  const privateKeyObject = {
+    key: formattedPrivateKey,
+    passphrase: ''
+  };
+
   try {
-    // Prova prima con la stringa PEM direttamente (alcune versioni di jsonwebtoken lo supportano)
-    return jwt.sign(payload, formattedPrivateKey, {
+    return jwt.sign(payload, privateKeyObject, {
       algorithm: "RS256",
       keyid: keyId,
     });
   } catch (error: any) {
-    console.error('❌ Errore con stringa PEM diretta:', error.message);
-    
-    // Se fallisce, prova con Buffer
-    try {
-      const keyBuffer = Buffer.from(formattedPrivateKey, 'utf8');
-      return jwt.sign(payload, keyBuffer, {
-        algorithm: "RS256",
-        keyid: keyId,
-      });
-    } catch (bufferError: any) {
-      console.error('❌ Errore con Buffer:', bufferError.message);
-      throw new Error(`Impossibile usare JAAS_PRIVATE_KEY: ${error.message}. Verifica che sia una chiave RSA valida in formato PEM.`);
-    }
+    console.error('❌ Errore generazione JWT:', error.message);
+    console.error('   Stack:', error.stack);
+    throw new Error(`Impossibile generare JWT con JAAS_PRIVATE_KEY: ${error.message}. Verifica che sia una chiave RSA valida in formato PEM.`);
   }
 }
 
