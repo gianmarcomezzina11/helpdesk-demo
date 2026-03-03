@@ -18,8 +18,9 @@ WORKDIR /app
 # Copia package files
 COPY package*.json ./
 
-# Installa dipendenze
-RUN npm ci --only=production
+# Verifica npm e installa dipendenze
+RUN node --version && npm --version
+RUN npm install --production
 
 # Copia il resto del codice
 COPY . .
