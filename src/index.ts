@@ -353,7 +353,6 @@ function generateMeshCentralConfig(): void {
   // In Azure, usa il dominio pubblico
   const IS_AZURE = process.env.WEBSITE_INSTANCE_ID !== undefined;
   const publicDomain = IS_AZURE ? (process.env.WEBSITE_HOSTNAME || 'localhost') : `${LOCAL_IP}:3001`;
-  const publicUrl = `https://${publicDomain}/meshcentral`;
   
   const config = {
     settings: {
@@ -366,10 +365,7 @@ function generateMeshCentralConfig(): void {
       cookieIpCheck: false,
       sessionTime: 60,
       sessionKey: "MyReallySecretPassword1",
-      certUrl: publicUrl,
       trustedProxy: LOCAL_IP,
-      reverseProxy: true,
-      reverseProxyUrl: "/meshcentral",
       agentAllowedIp: "0.0.0.0/0",
       tlsOffload: false,
       ignoreAgentHashCheck: true,
@@ -392,7 +388,6 @@ function generateMeshCentralConfig(): void {
         newAccounts: false,
         userNameIsEmail: false,
         footer: "Remote Control & Video Call System",
-        certUrl: publicUrl,
         guestDeviceSharing: true,
         desktopMultiplex: true,
         _userConsentFlags: 0
@@ -599,7 +594,10 @@ async function main() {
     target: `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`,
     changeOrigin: true,
     secure: false,  // Accetta certificati self-signed
-    ws: true  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
+    ws: true,  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
+    pathRewrite: {
+      '^/meshcentral': ''  // MeshCentral si aspetta path dalla root
+    }
   });
   
   // Wrapper per gestire errori del proxy
