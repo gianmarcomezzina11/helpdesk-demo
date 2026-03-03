@@ -367,6 +367,7 @@ function generateMeshCentralConfig(): void {
       sessionTime: 60,
       sessionKey: "MyReallySecretPassword1",
       certUrl: certUrl,  // URL completo del proxy
+      webRelayDNS: IS_AZURE ? publicDomain : undefined,  // Dice a MeshCentral il dominio pubblico
       trustedProxy: LOCAL_IP,
       agentAllowedIp: "192.168.0.0/16",
       tlsOffload: false,  // Gestisce TLS internamente (no proxy esterno)
