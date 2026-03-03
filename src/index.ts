@@ -350,6 +350,11 @@ function generateMeshCentralConfig(): void {
   const hostname = os.hostname();
   const configPath = path.join(process.cwd(), 'meshcentral-config.json');
   
+  // In Azure, usa il dominio pubblico
+  const IS_AZURE = process.env.WEBSITE_INSTANCE_ID !== undefined;
+  const publicDomain = IS_AZURE ? (process.env.WEBSITE_HOSTNAME || 'localhost') : `${LOCAL_IP}:3001`;
+  const publicUrl = `https://${publicDomain}/meshcentral`;
+  
   const config = {
     settings: {
       cert: `${LOCAL_IP},${hostname}`,
@@ -358,13 +363,15 @@ function generateMeshCentralConfig(): void {
       allowLoginToken: true,
       allowFraming: true,
       cookieSameSite: "none",
-      cookieIpCheck: false,  // Disabilita controllo IP per iframe
+      cookieIpCheck: false,
       sessionTime: 60,
       sessionKey: "MyReallySecretPassword1",
-      certUrl: `https://${LOCAL_IP}:3001/meshcentral`,  // URL completo del proxy
+      certUrl: publicUrl,
       trustedProxy: LOCAL_IP,
-      agentAllowedIp: "192.168.0.0/16",
-      tlsOffload: false,  // Gestisce TLS internamente (no proxy esterno)
+      reverseProxy: true,
+      reverseProxyUrl: "/meshcentral",
+      agentAllowedIp: "0.0.0.0/0",
+      tlsOffload: false,
       ignoreAgentHashCheck: true,
       allowHighQualityDesktop: true,
       agentUpdateBlockSize: 1024,
@@ -372,7 +379,7 @@ function generateMeshCentralConfig(): void {
       compression: true,
       wsCompression: true,
       agentWsCompression: true,
-      _userConsentFlags: 0,  // FORZA: Nessun consenso (underscore nasconde opzione UI)
+      _userConsentFlags: 0,
       agentConfig: {
         noProxy: true,
         ignoreProxyFile: true
@@ -385,10 +392,10 @@ function generateMeshCentralConfig(): void {
         newAccounts: false,
         userNameIsEmail: false,
         footer: "Remote Control & Video Call System",
-        certUrl: `https://${LOCAL_IP}:3001/meshcentral`,  // URL completo del proxy
+        certUrl: publicUrl,
         guestDeviceSharing: true,
         desktopMultiplex: true,
-        _userConsentFlags: 0  // FORZA: Nessun consenso (underscore nasconde opzione UI)
+        _userConsentFlags: 0
       }
     }
   };
