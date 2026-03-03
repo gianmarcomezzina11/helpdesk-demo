@@ -599,10 +599,7 @@ async function main() {
     target: `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`,
     changeOrigin: true,
     secure: false,  // Accetta certificati self-signed
-    ws: true,  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
-    pathRewrite: {
-      '^/meshcentral': ''  // Rimuovi /meshcentral dal path
-    }
+    ws: true  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
   });
   
   // Wrapper per gestire errori del proxy
