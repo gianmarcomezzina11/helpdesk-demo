@@ -159,8 +159,23 @@ function generateJWT(
     },
   };
 
-  // Gestione della private key con newline
-  const formattedPrivateKey = privateKey.replace(/\\n/g, "\n");
+  // Gestione della private key con newline - supporta vari formati
+  let formattedPrivateKey = privateKey;
+  
+  // Se contiene \n letterali (escaped), convertili in newline reali
+  if (privateKey.includes('\\n')) {
+    formattedPrivateKey = privateKey.replace(/\\n/g, "\n");
+  }
+  
+  // Assicurati che inizi e finisca correttamente
+  if (!formattedPrivateKey.includes('-----BEGIN')) {
+    throw new Error('JAAS_PRIVATE_KEY non è nel formato corretto. Deve iniziare con -----BEGIN PRIVATE KEY-----');
+  }
+  
+  console.error('🔑 Private key format check:');
+  console.error(`   Lunghezza: ${formattedPrivateKey.length} caratteri`);
+  console.error(`   Inizia con: ${formattedPrivateKey.substring(0, 27)}`);
+  console.error(`   Finisce con: ${formattedPrivateKey.substring(formattedPrivateKey.length - 25)}`);
 
   return jwt.sign(payload, formattedPrivateKey, {
     algorithm: "RS256",
