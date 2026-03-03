@@ -350,10 +350,10 @@ function generateMeshCentralConfig(): void {
   const hostname = os.hostname();
   const configPath = path.join(process.cwd(), 'meshcentral-config.json');
   
-  // In Azure, usa il dominio pubblico per certUrl
+  // In Azure, usa il dominio pubblico per certUrl (root, non subpath)
   const IS_AZURE = process.env.WEBSITE_INSTANCE_ID !== undefined;
   const publicDomain = IS_AZURE ? (process.env.WEBSITE_HOSTNAME || 'localhost') : `${LOCAL_IP}:3001`;
-  const certUrl = `https://${publicDomain}/meshcentral`;
+  const certUrl = `https://${publicDomain}`;  // MeshCentral servito dalla root
   
   const config = {
     settings: {
@@ -366,8 +366,7 @@ function generateMeshCentralConfig(): void {
       cookieIpCheck: false,  // Disabilita controllo IP per iframe
       sessionTime: 60,
       sessionKey: "MyReallySecretPassword1",
-      certUrl: certUrl,  // URL completo del proxy
-      webRelayDNS: IS_AZURE ? publicDomain : undefined,  // Dice a MeshCentral il dominio pubblico
+      certUrl: certUrl,  // URL pubblico dalla root
       trustedProxy: LOCAL_IP,
       agentAllowedIp: "192.168.0.0/16",
       tlsOffload: false,  // Gestisce TLS internamente (no proxy esterno)
@@ -391,7 +390,7 @@ function generateMeshCentralConfig(): void {
         newAccounts: false,
         userNameIsEmail: false,
         footer: "Remote Control & Video Call System",
-        certUrl: certUrl,  // URL completo del proxy
+        certUrl: certUrl,  // URL pubblico dalla root
         guestDeviceSharing: true,
         desktopMultiplex: true,
         _userConsentFlags: 0  // FORZA: Nessun consenso (underscore nasconde opzione UI)
@@ -591,23 +590,8 @@ async function main() {
   );
   app.use(express.json());
 
-  // Reverse Proxy per MeshCentral (porta 4000 -> /meshcentral/ su porta 3001)
-  // Questo permette di servire MeshCentral sulla stessa porta dell'app = No CORS!
-  // Gli agent si connettono direttamente a porta 4000
-  app.use('/meshcentral', createProxyMiddleware({
-    target: `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`,
-    changeOrigin: true,
-    secure: false,  // Accetta certificati self-signed
-    ws: true,  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
-    pathRewrite: {
-      '^/meshcentral': ''  // Rimuovi /meshcentral dal path
-    }
-  }));
-  
-  console.error('✅ Reverse proxy MeshCentral: /meshcentral/* -> porta 4000');
-
   // MCP endpoint - POST for client-to-server messages
-  app.post("/mcp", async (req: Request, res: Response) => {
+  app.post("/api/mcp", async (req: Request, res: Response) => {
     console.error("POST request ricevuta");
     
     try {
@@ -636,14 +620,28 @@ async function main() {
   });
 
   // GET not supported in stateless mode
-  app.get("/mcp", (req: Request, res: Response) => {
+  app.get("/api/mcp", (req: Request, res: Response) => {
     res.status(405).end();
   });
 
   // Health check endpoint
-  app.get("/health", (req: Request, res: Response) => {
-    res.json({ status: "ok", server: "mcp-jitsi-jaas-server" });
+  app.get("/api/health", (req: Request, res: Response) => {
+    res.json({ status: "ok", server: "mcp-jitsi-jaas-server", meshcentral: meshEnabled });
   });
+  
+  console.error('✅ API endpoints: /api/mcp, /api/health');
+
+  // Reverse Proxy per MeshCentral dalla ROOT (porta 4000 -> / su porta 8080)
+  // MeshCentral viene servito dalla root per compatibilità con path relativi
+  // Gli agent si connettono direttamente a porta 4000
+  app.use('/', createProxyMiddleware({
+    target: `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`,
+    changeOrigin: true,
+    secure: false,  // Accetta certificati self-signed
+    ws: true  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
+  }));
+  
+  console.error('✅ Reverse proxy MeshCentral: / -> porta 4000');
 
   // Endpoint per compatibilità (non più usato)
   app.get('/meshproxy/:nodeId', async (req: Request, res: Response) => {
@@ -950,10 +948,10 @@ async function main() {
       console.error(`   MCP Jitsi + MeshCentral Server (Azure)`);
       console.error(`========================================`);
       console.error(`📹 Server URL: ${SERVER_URL}`);
-      console.error(`🔧 MCP endpoint: ${SERVER_URL}/mcp`);
-      console.error(`💚 Health check: ${SERVER_URL}/health`);
+      console.error(`🔧 MCP endpoint: ${SERVER_URL}/api/mcp`);
+      console.error(`💚 Health check: ${SERVER_URL}/api/health`);
       if (meshEnabled) {
-        console.error(`🖥️  MeshCentral: ${MESHCENTRAL_URL}`);
+        console.error(`🖥️  MeshCentral: ${SERVER_URL}/ (root)`);
       } else {
         console.error(`⚠️  MeshCentral: Non disponibile`);
       }
