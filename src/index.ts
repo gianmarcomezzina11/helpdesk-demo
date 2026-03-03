@@ -388,10 +388,11 @@ function generateMeshCentralConfig(): void {
       "": {
         title: "Remote Control System",
         title2: "Controllo Remoto",
-        newAccounts: false,
+        newAccounts: true,  // Abilita creazione account
         userNameIsEmail: false,
         footer: "Remote Control & Video Call System",
         certUrl: certUrl,  // URL pubblico dalla root
+        allowedOrigin: publicDomain,  // Accetta richieste dal dominio pubblico (anche nel dominio)
         guestDeviceSharing: true,
         desktopMultiplex: true,
         _userConsentFlags: 0  // FORZA: Nessun consenso (underscore nasconde opzione UI)
@@ -639,6 +640,14 @@ async function main() {
     req.headers['x-forwarded-host'] = publicHost;
     req.headers['x-forwarded-proto'] = 'https';
     req.headers['x-forwarded-for'] = req.ip || req.socket.remoteAddress || '';
+    
+    // Debug logging
+    if (req.path === '/' || req.path.startsWith('/control')) {
+      console.error(`🔍 MeshCentral request: ${req.method} ${req.path}`);
+      console.error(`   Origin: ${req.headers.origin || 'none'}`);
+      console.error(`   X-Forwarded-Host: ${req.headers['x-forwarded-host']}`);
+    }
+    
     next();
   });
 
