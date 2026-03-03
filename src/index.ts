@@ -362,6 +362,7 @@ function generateMeshCentralConfig(): void {
       redirPort: 0,
       allowLoginToken: true,
       allowFraming: true,
+      allowedOrigin: publicDomain,  // Accetta richieste dal dominio pubblico
       cookieSameSite: "none",
       cookieIpCheck: false,  // Disabilita controllo IP per iframe
       sessionTime: 60,
