@@ -350,10 +350,6 @@ function generateMeshCentralConfig(): void {
   const hostname = os.hostname();
   const configPath = path.join(process.cwd(), 'meshcentral-config.json');
   
-  // In Azure, usa il dominio pubblico
-  const IS_AZURE = process.env.WEBSITE_INSTANCE_ID !== undefined;
-  const publicDomain = IS_AZURE ? (process.env.WEBSITE_HOSTNAME || 'localhost') : `${LOCAL_IP}:3001`;
-  
   const config = {
     settings: {
       cert: `${LOCAL_IP},${hostname}`,
@@ -362,12 +358,13 @@ function generateMeshCentralConfig(): void {
       allowLoginToken: true,
       allowFraming: true,
       cookieSameSite: "none",
-      cookieIpCheck: false,
+      cookieIpCheck: false,  // Disabilita controllo IP per iframe
       sessionTime: 60,
       sessionKey: "MyReallySecretPassword1",
+      certUrl: `https://${LOCAL_IP}:3001/meshcentral`,  // URL completo del proxy
       trustedProxy: LOCAL_IP,
-      agentAllowedIp: "0.0.0.0/0",
-      tlsOffload: false,
+      agentAllowedIp: "192.168.0.0/16",
+      tlsOffload: false,  // Gestisce TLS internamente (no proxy esterno)
       ignoreAgentHashCheck: true,
       allowHighQualityDesktop: true,
       agentUpdateBlockSize: 1024,
@@ -375,7 +372,7 @@ function generateMeshCentralConfig(): void {
       compression: true,
       wsCompression: true,
       agentWsCompression: true,
-      _userConsentFlags: 0,
+      _userConsentFlags: 0,  // FORZA: Nessun consenso (underscore nasconde opzione UI)
       agentConfig: {
         noProxy: true,
         ignoreProxyFile: true
@@ -388,9 +385,10 @@ function generateMeshCentralConfig(): void {
         newAccounts: false,
         userNameIsEmail: false,
         footer: "Remote Control & Video Call System",
+        certUrl: `https://${LOCAL_IP}:3001/meshcentral`,  // URL completo del proxy
         guestDeviceSharing: true,
         desktopMultiplex: true,
-        _userConsentFlags: 0
+        _userConsentFlags: 0  // FORZA: Nessun consenso (underscore nasconde opzione UI)
       }
     }
   };
@@ -590,51 +588,15 @@ async function main() {
   // Reverse Proxy per MeshCentral (porta 4000 -> /meshcentral/ su porta 3001)
   // Questo permette di servire MeshCentral sulla stessa porta dell'app = No CORS!
   // Gli agent si connettono direttamente a porta 4000
-  const meshProxy = createProxyMiddleware({
+  app.use('/meshcentral', createProxyMiddleware({
     target: `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`,
     changeOrigin: true,
     secure: false,  // Accetta certificati self-signed
     ws: true,  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
     pathRewrite: {
-      '^/meshcentral': ''  // MeshCentral si aspetta path dalla root
+      '^/meshcentral': ''  // Rimuovi /meshcentral dal path
     }
-  });
-  
-  // Wrapper per gestire errori del proxy
-  app.use('/meshcentral', (req: Request, res: Response, next) => {
-    console.error(`🔄 Proxy request: ${req.method} ${req.url}`);
-    
-    // Timeout per evitare hang
-    const timeout = setTimeout(() => {
-      if (!res.headersSent) {
-        console.error('⏱️ Timeout proxy MeshCentral');
-        res.status(503).send(`
-          <html>
-            <head><title>MeshCentral Non Disponibile</title></head>
-            <body style="font-family: Arial; padding: 50px; text-align: center;">
-              <h1>🔧 MeshCentral Non Disponibile</h1>
-              <p>MeshCentral si sta ancora avviando o non è raggiungibile.</p>
-              <p>Attendi 30-60 secondi e ricarica la pagina.</p>
-              <p><a href="/meshcentral">Ricarica</a></p>
-            </body>
-          </html>
-        `);
-      }
-    }, 10000); // 10 secondi timeout
-    
-    res.on('finish', () => clearTimeout(timeout));
-    res.on('close', () => clearTimeout(timeout));
-    
-    try {
-      meshProxy(req, res, next);
-    } catch (error) {
-      clearTimeout(timeout);
-      console.error('❌ Errore proxy MeshCentral:', error);
-      if (!res.headersSent) {
-        res.status(503).send('MeshCentral non disponibile');
-      }
-    }
-  });
+  }));
   
   console.error('✅ Reverse proxy MeshCentral: /meshcentral/* -> porta 4000');
 
