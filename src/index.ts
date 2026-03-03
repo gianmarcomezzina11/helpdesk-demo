@@ -388,7 +388,7 @@ function generateMeshCentralConfig(): void {
       "": {
         title: "Remote Control System",
         title2: "Controllo Remoto",
-        newAccounts: true,  // Abilita creazione account
+        newAccounts: false,  // Disabilita creazione nuovi account per sicurezza
         userNameIsEmail: false,
         footer: "Remote Control & Video Call System",
         certUrl: certUrl,  // URL pubblico dalla root
