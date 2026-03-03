@@ -38,6 +38,7 @@ EXPOSE 8080
 
 # Variabile d'ambiente per produzione
 ENV NODE_ENV=production
+ENV PORT=8080
 
 # Startup command
 CMD ["npm", "start"]
