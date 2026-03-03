@@ -638,7 +638,14 @@ async function main() {
     target: `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`,
     changeOrigin: true,
     secure: false,  // Accetta certificati self-signed
-    ws: true  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
+    ws: true,  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
+    onProxyReq: (proxyReq, req, res) => {
+      // Informa MeshCentral del dominio pubblico reale
+      const publicHost = IS_AZURE ? (process.env.WEBSITE_HOSTNAME || 'localhost') : `${LOCAL_IP}:${PORT}`;
+      proxyReq.setHeader('X-Forwarded-Host', publicHost);
+      proxyReq.setHeader('X-Forwarded-Proto', 'https');
+      proxyReq.setHeader('X-Forwarded-For', req.ip || req.socket.remoteAddress || '');
+    }
   }));
   
   console.error('✅ Reverse proxy MeshCentral: / -> porta 4000');
