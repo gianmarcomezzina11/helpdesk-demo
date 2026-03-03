@@ -1,16 +1,16 @@
 # Dockerfile per MCP Jitsi + MeshCentral su Azure App Service Container
-FROM node:18-alpine
+FROM node:18-slim
 
-# Installa dipendenze di sistema per MeshCentral e npm
-RUN apk add --no-cache \
-    npm \
+# Installa dipendenze di sistema per MeshCentral
+RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
-    cairo-dev \
-    jpeg-dev \
-    pango-dev \
-    giflib-dev
+    libcairo2-dev \
+    libjpeg-dev \
+    libpango1.0-dev \
+    libgif-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Crea directory app
 WORKDIR /app
