@@ -631,6 +631,16 @@ async function main() {
   
   console.error('✅ API endpoints: /api/mcp, /api/health');
 
+  // Middleware per impostare X-Forwarded headers prima del proxy MeshCentral
+  app.use('/', (req: Request, res: Response, next) => {
+    // Informa MeshCentral del dominio pubblico reale tramite headers
+    const publicHost = IS_AZURE ? (process.env.WEBSITE_HOSTNAME || 'localhost') : `${LOCAL_IP}:${PORT}`;
+    req.headers['x-forwarded-host'] = publicHost;
+    req.headers['x-forwarded-proto'] = 'https';
+    req.headers['x-forwarded-for'] = req.ip || req.socket.remoteAddress || '';
+    next();
+  });
+
   // Reverse Proxy per MeshCentral dalla ROOT (porta 4000 -> / su porta 8080)
   // MeshCentral viene servito dalla root per compatibilità con path relativi
   // Gli agent si connettono direttamente a porta 4000
@@ -638,14 +648,7 @@ async function main() {
     target: `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`,
     changeOrigin: true,
     secure: false,  // Accetta certificati self-signed
-    ws: true,  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
-    onProxyReq: (proxyReq, req, res) => {
-      // Informa MeshCentral del dominio pubblico reale
-      const publicHost = IS_AZURE ? (process.env.WEBSITE_HOSTNAME || 'localhost') : `${LOCAL_IP}:${PORT}`;
-      proxyReq.setHeader('X-Forwarded-Host', publicHost);
-      proxyReq.setHeader('X-Forwarded-Proto', 'https');
-      proxyReq.setHeader('X-Forwarded-For', req.ip || req.socket.remoteAddress || '');
-    }
+    ws: true  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
   }));
   
   console.error('✅ Reverse proxy MeshCentral: / -> porta 4000');
