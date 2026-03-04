@@ -170,6 +170,10 @@ function generateJWT(
     console.error('🔑 Private key già con newline reali (multilinea)');
   }
   
+  // Rimuovi spazi extra all'inizio di ogni riga (Azure potrebbe aggiungerli)
+  formattedPrivateKey = formattedPrivateKey.split('\n').map(line => line.trim()).join('\n');
+  console.error('🔑 Rimossi spazi extra da ogni riga');
+  
   // Assicurati che inizi e finisca correttamente
   if (!formattedPrivateKey.includes('-----BEGIN')) {
     throw new Error('JAAS_PRIVATE_KEY non è nel formato corretto. Deve iniziare con -----BEGIN PRIVATE KEY-----');
