@@ -389,7 +389,7 @@ function generateMeshCentralConfig(): void {
   const config = {
     settings: {
       cert: `${LOCAL_IP},${hostname}`,
-      port: PORT,  // Usa porta 8080 (Azure) invece di 4000
+      port: 4000,  // Porta interna per MeshCentral
       redirPort: 0,
       allowLoginToken: true,
       allowFraming: true,
@@ -661,7 +661,23 @@ async function main() {
   });
   
   console.error('✅ API endpoints: /api/mcp, /api/health');
-  console.error('✅ MeshCentral gestisce direttamente tutte le altre richieste sulla porta 8080');
+
+  // Reverse Proxy per MeshCentral dalla ROOT (porta 4000 -> / su porta 8080)
+  // Supporta sia web UI che connessioni agent tramite WebSocket
+  app.use('/', createProxyMiddleware({
+    target: `https://${LOCAL_IP}:4000`,
+    changeOrigin: true,
+    secure: false,  // Accetta certificati self-signed
+    ws: true,  // CRITICO: Proxy WebSocket per agent e sessioni remote
+    onProxyReq: (proxyReq, req, res) => {
+      // Informa MeshCentral del dominio pubblico per agent
+      const publicHost = IS_AZURE ? (process.env.WEBSITE_HOSTNAME || 'localhost') : `${LOCAL_IP}:${PORT}`;
+      proxyReq.setHeader('X-Forwarded-Host', publicHost);
+      proxyReq.setHeader('X-Forwarded-Proto', 'https');
+    }
+  }));
+  
+  console.error('✅ Reverse proxy MeshCentral: / -> porta 4000 (web UI + agent)');
 
   // Endpoint per compatibilità (non più usato)
   app.get('/meshproxy/:nodeId', async (req: Request, res: Response) => {
