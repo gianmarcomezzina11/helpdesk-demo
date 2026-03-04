@@ -159,12 +159,15 @@ function generateJWT(
     },
   };
 
-  // Gestione della private key con newline - supporta vari formati
+  // Gestione della private key - supporta sia newline reali che escaped
   let formattedPrivateKey = privateKey;
   
   // Se contiene \n letterali (escaped), convertili in newline reali
   if (privateKey.includes('\\n')) {
     formattedPrivateKey = privateKey.replace(/\\n/g, "\n");
+    console.error('🔑 Convertiti \\n escaped in newline reali');
+  } else {
+    console.error('🔑 Private key già con newline reali (multilinea)');
   }
   
   // Assicurati che inizi e finisca correttamente
@@ -176,21 +179,17 @@ function generateJWT(
   console.error(`   Lunghezza: ${formattedPrivateKey.length} caratteri`);
   console.error(`   Inizia con: ${formattedPrivateKey.substring(0, 27)}`);
   console.error(`   Finisce con: ${formattedPrivateKey.substring(formattedPrivateKey.length - 25)}`);
-
-  // Per jsonwebtoken 9.x con RS256, usa oggetto con key e passphrase
-  const privateKeyObject = {
-    key: formattedPrivateKey,
-    passphrase: ''
-  };
+  console.error(`   Contiene newline: ${formattedPrivateKey.includes('\n')}`);
+  console.error(`   Numero righe: ${formattedPrivateKey.split('\n').length}`);
 
   try {
-    return jwt.sign(payload, privateKeyObject, {
+    // Prova senza oggetto wrapper (jsonwebtoken 9.x supporta stringa PEM diretta per chiavi non criptate)
+    return jwt.sign(payload, formattedPrivateKey, {
       algorithm: "RS256",
       keyid: keyId,
     });
   } catch (error: any) {
     console.error('❌ Errore generazione JWT:', error.message);
-    console.error('   Stack:', error.stack);
     throw new Error(`Impossibile generare JWT con JAAS_PRIVATE_KEY: ${error.message}. Verifica che sia una chiave RSA valida in formato PEM.`);
   }
 }
