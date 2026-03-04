@@ -46,6 +46,7 @@ dotenv.config();
 let LOCAL_IP: string;
 let MESHCENTRAL_URL: string;
 let SERVER_URL: string;
+const PORT = process.env.PORT || 3000;  // Porta unificata (Azure usa 8080)
 
 // Interfacce TypeScript
 interface JitsiMeetingResponse {
@@ -388,7 +389,7 @@ function generateMeshCentralConfig(): void {
   const config = {
     settings: {
       cert: `${LOCAL_IP},${hostname}`,
-      port: 4000,
+      port: PORT,  // Usa porta 8080 (Azure) invece di 4000
       redirPort: 0,
       allowLoginToken: true,
       allowFraming: true,
@@ -399,7 +400,7 @@ function generateMeshCentralConfig(): void {
       sessionKey: "MyReallySecretPassword1",
       certUrl: certUrl,  // URL pubblico dalla root
       trustedProxy: LOCAL_IP,
-      agentAllowedIp: "192.168.0.0/16",
+      agentAllowedIp: "0.0.0.0/0",  // Permetti agent da qualsiasi IP (necessario per Azure)
       tlsOffload: false,  // Gestisce TLS internamente (no proxy esterno)
       ignoreAgentHashCheck: true,
       allowHighQualityDesktop: true,
@@ -587,12 +588,10 @@ async function createMeshGuestLink(nodeId: string): Promise<string | null> {
 // Start the HTTP server with Streamable HTTP transport
 async function main() {
   const app = express();
-  const PORT = process.env.PORT || 3000;  // Porta unificata (Azure usa 8080)
   const IS_AZURE = process.env.WEBSITE_INSTANCE_ID !== undefined;  // Detect Azure
   
   // Rileva automaticamente l'IP locale e inizializza variabili globali
   LOCAL_IP = IS_AZURE ? 'localhost' : getLocalIP();
-  const MESHCENTRAL_PORT = 4000;  // Porta standard per agent
   
   // In Azure, usa il dominio pubblico invece di IP locale
   if (IS_AZURE) {
@@ -662,36 +661,7 @@ async function main() {
   });
   
   console.error('✅ API endpoints: /api/mcp, /api/health');
-
-  // Middleware per impostare X-Forwarded headers prima del proxy MeshCentral
-  app.use('/', (req: Request, res: Response, next) => {
-    // Informa MeshCentral del dominio pubblico reale tramite headers
-    const publicHost = IS_AZURE ? (process.env.WEBSITE_HOSTNAME || 'localhost') : `${LOCAL_IP}:${PORT}`;
-    req.headers['x-forwarded-host'] = publicHost;
-    req.headers['x-forwarded-proto'] = 'https';
-    req.headers['x-forwarded-for'] = req.ip || req.socket.remoteAddress || '';
-    
-    // Debug logging
-    if (req.path === '/' || req.path.startsWith('/control')) {
-      console.error(`🔍 MeshCentral request: ${req.method} ${req.path}`);
-      console.error(`   Origin: ${req.headers.origin || 'none'}`);
-      console.error(`   X-Forwarded-Host: ${req.headers['x-forwarded-host']}`);
-    }
-    
-    next();
-  });
-
-  // Reverse Proxy per MeshCentral dalla ROOT (porta 4000 -> / su porta 8080)
-  // MeshCentral viene servito dalla root per compatibilità con path relativi
-  // Gli agent si connettono direttamente a porta 4000
-  app.use('/', createProxyMiddleware({
-    target: `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`,
-    changeOrigin: true,
-    secure: false,  // Accetta certificati self-signed
-    ws: true  // Proxy WebSocket per sessioni remote (CRITICO per desktop streaming)
-  }));
-  
-  console.error('✅ Reverse proxy MeshCentral: / -> porta 4000');
+  console.error('✅ MeshCentral gestisce direttamente tutte le altre richieste sulla porta 8080');
 
   // Endpoint per compatibilità (non più usato)
   app.get('/meshproxy/:nodeId', async (req: Request, res: Response) => {
