@@ -599,7 +599,7 @@ async function main() {
     MESHCENTRAL_URL = `https://${azureDomain}/meshcentral-internal`;
     SERVER_URL = `https://${azureDomain}`;
   } else {
-    MESHCENTRAL_URL = `https://${LOCAL_IP}:${MESHCENTRAL_PORT}`;
+    MESHCENTRAL_URL = `https://${LOCAL_IP}:${PORT}`;
     SERVER_URL = `https://${LOCAL_IP}:${PORT}`;
   }
   
