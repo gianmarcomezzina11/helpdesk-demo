@@ -387,13 +387,31 @@ function generateMeshCentralConfig(): void {
     console.error('🗑️  Config MeshCentral esistente eliminato per rigenerazione');
   }
   
-  // In Azure, usa il dominio pubblico per certUrl (root, non subpath)
-  const IS_AZURE = process.env.WEBSITE_INSTANCE_ID !== undefined;
-  const publicDomain = IS_AZURE 
-    ? 'aw-demo-helpdesk-arbaf2hebbeza6ct.italynorth-01.azurewebsites.net'  // Dominio Azure fisso
-    : `${LOCAL_IP}:3001`;
-  const certUrl = `https://${publicDomain}`;  // MeshCentral servito dalla root
+  // Rileva ambiente e dominio pubblico
+  const IS_AZURE_APP_SERVICE = process.env.WEBSITE_INSTANCE_ID !== undefined;
+  const IS_CONTAINER_INSTANCE = process.env.CONTAINER_FQDN !== undefined;
   
+  let publicDomain: string;
+  let protocol: string;
+  
+  if (IS_CONTAINER_INSTANCE) {
+    // Azure Container Instance - usa FQDN da variabile d'ambiente
+    publicDomain = process.env.CONTAINER_FQDN!;
+    protocol = 'http';  // Container Instance usa HTTP (HTTPS tramite Cloudflare dopo)
+    console.error(`🐳 Ambiente: Azure Container Instance`);
+  } else if (IS_AZURE_APP_SERVICE) {
+    // Azure App Service
+    publicDomain = 'aw-demo-helpdesk-arbaf2hebbeza6ct.italynorth-01.azurewebsites.net';
+    protocol = 'https';
+    console.error(`☁️ Ambiente: Azure App Service`);
+  } else {
+    // Locale
+    publicDomain = `${LOCAL_IP}:${PORT}`;
+    protocol = 'https';
+    console.error(`💻 Ambiente: Locale`);
+  }
+  
+  const certUrl = `${protocol}://${publicDomain}`;
   console.error(`🔧 MeshCentral certUrl: ${certUrl}`);
   
   const config = {
