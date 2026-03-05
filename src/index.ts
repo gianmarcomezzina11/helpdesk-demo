@@ -381,6 +381,12 @@ function generateMeshCentralConfig(): void {
   const hostname = os.hostname();
   const configPath = path.join(process.cwd(), 'meshcentral-config.json');
   
+  // Elimina config esistente per forzare rigenerazione con nuovo certUrl
+  if (fs.existsSync(configPath)) {
+    fs.unlinkSync(configPath);
+    console.error('🗑️  Config MeshCentral esistente eliminato per rigenerazione');
+  }
+  
   // In Azure, usa il dominio pubblico per certUrl (root, non subpath)
   const IS_AZURE = process.env.WEBSITE_INSTANCE_ID !== undefined;
   const publicDomain = IS_AZURE 
