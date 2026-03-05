@@ -395,12 +395,11 @@ function generateMeshCentralConfig(): void {
   let protocol: string;
   
   if (IS_CONTAINER_INSTANCE) {
-    // Azure Container Instance - rileva FQDN automaticamente dall'hostname
-    // Azure imposta l'hostname come FQDN completo del container
-    publicDomain = hostname;
+    // Azure Container Instance - FQDN hardcodato
+    publicDomain = 'hevls-helpdesk-demo.c8ezfrdbgvgvdmhj.italynorth.azurecontainer.io';
     protocol = 'http';  // Container Instance usa HTTP (HTTPS tramite nginx dopo)
     console.error(`🐳 Ambiente: Azure Container Instance`);
-    console.error(`🌐 FQDN auto-rilevato: ${publicDomain}`);
+    console.error(`🌐 FQDN: ${publicDomain}`);
   } else if (IS_AZURE_APP_SERVICE) {
     // Azure App Service
     publicDomain = process.env.WEBSITE_HOSTNAME || 'aw-demo-helpdesk-arbaf2hebbeza6ct.italynorth-01.azurewebsites.net';
