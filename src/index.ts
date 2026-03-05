@@ -383,8 +383,12 @@ function generateMeshCentralConfig(): void {
   
   // In Azure, usa il dominio pubblico per certUrl (root, non subpath)
   const IS_AZURE = process.env.WEBSITE_INSTANCE_ID !== undefined;
-  const publicDomain = IS_AZURE ? (process.env.WEBSITE_HOSTNAME || 'localhost') : `${LOCAL_IP}:3001`;
+  const publicDomain = IS_AZURE 
+    ? 'aw-demo-helpdesk-arbaf2hebbeza6ct.italynorth-01.azurewebsites.net'  // Dominio Azure fisso
+    : `${LOCAL_IP}:3001`;
   const certUrl = `https://${publicDomain}`;  // MeshCentral servito dalla root
+  
+  console.error(`🔧 MeshCentral certUrl: ${certUrl}`);
   
   const config = {
     settings: {
