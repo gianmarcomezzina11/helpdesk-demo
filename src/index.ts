@@ -422,7 +422,7 @@ function generateMeshCentralConfig(): void {
       redirPort: 0,
       allowLoginToken: true,
       allowFraming: true,
-      allowedOrigin: publicDomain,  // Accetta richieste dal dominio pubblico
+      allowedOrigin: "*",  // Accetta richieste da qualsiasi origine (necessario per porte multiple)
       cookieSameSite: "none",
       cookieIpCheck: false,  // Disabilita controllo IP per iframe
       sessionTime: 60,
@@ -452,7 +452,7 @@ function generateMeshCentralConfig(): void {
         userNameIsEmail: false,
         footer: "Remote Control & Video Call System",
         certUrl: certUrl,  // URL pubblico dalla root
-        allowedOrigin: publicDomain,  // Accetta richieste dal dominio pubblico (anche nel dominio)
+        allowedOrigin: "*",  // Accetta richieste da qualsiasi origine (necessario per porte multiple)
         guestDeviceSharing: true,
         desktopMultiplex: true,
         _userConsentFlags: 0  // FORZA: Nessun consenso (underscore nasconde opzione UI)
