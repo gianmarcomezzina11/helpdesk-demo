@@ -389,19 +389,21 @@ function generateMeshCentralConfig(): void {
   
   // Rileva ambiente e dominio pubblico
   const IS_AZURE_APP_SERVICE = process.env.WEBSITE_INSTANCE_ID !== undefined;
-  const IS_CONTAINER_INSTANCE = process.env.CONTAINER_FQDN !== undefined;
+  const IS_CONTAINER_INSTANCE = hostname.includes('azurecontainer.io');
   
   let publicDomain: string;
   let protocol: string;
   
   if (IS_CONTAINER_INSTANCE) {
-    // Azure Container Instance - usa FQDN da variabile d'ambiente
-    publicDomain = process.env.CONTAINER_FQDN!;
-    protocol = 'http';  // Container Instance usa HTTP (HTTPS tramite Cloudflare dopo)
+    // Azure Container Instance - rileva FQDN automaticamente dall'hostname
+    // Azure imposta l'hostname come FQDN completo del container
+    publicDomain = hostname;
+    protocol = 'http';  // Container Instance usa HTTP (HTTPS tramite nginx dopo)
     console.error(`🐳 Ambiente: Azure Container Instance`);
+    console.error(`🌐 FQDN auto-rilevato: ${publicDomain}`);
   } else if (IS_AZURE_APP_SERVICE) {
     // Azure App Service
-    publicDomain = 'aw-demo-helpdesk-arbaf2hebbeza6ct.italynorth-01.azurewebsites.net';
+    publicDomain = process.env.WEBSITE_HOSTNAME || 'aw-demo-helpdesk-arbaf2hebbeza6ct.italynorth-01.azurewebsites.net';
     protocol = 'https';
     console.error(`☁️ Ambiente: Azure App Service`);
   } else {
